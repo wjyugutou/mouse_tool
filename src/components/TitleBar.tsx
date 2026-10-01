@@ -1,114 +1,120 @@
-import { useCallback, useEffect, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useCallback, useEffect, useState } from "react"
+import { Icon } from "@iconify/react"
+import { useNavigate, useRouterState } from "@tanstack/react-router"
+import { openUrl } from "@tauri-apps/plugin-opener"
+import { getCurrentWindow } from "@tauri-apps/api/window"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
-const GITHUB_URL = "https://github.com/wjyugutou/mouse_tool";
+const GITHUB_URL = "https://github.com/wjyugutou/mouse_tool"
 
-interface Props {
-  onOpenSettings: () => void;
-}
-
-export function TitleBar({ onOpenSettings }: Props) {
-  const [maximized, setMaximized] = useState(false);
+export function TitleBar() {
+  const navigate = useNavigate()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const [maximized, setMaximized] = useState(false)
 
   const syncMaximized = useCallback(async () => {
     try {
-      setMaximized(await getCurrentWindow().isMaximized());
+      setMaximized(await getCurrentWindow().isMaximized())
     } catch {
       /* browser preview */
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    void syncMaximized();
-    let unlisten: (() => void) | undefined;
+    void syncMaximized()
+    let unlisten: (() => void) | undefined
     void (async () => {
       try {
         unlisten = await getCurrentWindow().onResized(() => {
-          void syncMaximized();
-        });
+          void syncMaximized()
+        })
       } catch {
         /* ignore */
       }
-    })();
-    return () => unlisten?.();
-  }, [syncMaximized]);
+    })()
+    return () => unlisten?.()
+  }, [syncMaximized])
 
   const minimize = () => {
-    void getCurrentWindow().minimize();
-  };
+    void getCurrentWindow().minimize()
+  }
   const toggleMaximize = () => {
-    void getCurrentWindow().toggleMaximize().then(() => syncMaximized());
-  };
+    void getCurrentWindow().toggleMaximize().then(() => syncMaximized())
+  }
   const close = () => {
-    void getCurrentWindow().close();
-  };
-  const openGithub = () => {
-    void openUrl(GITHUB_URL);
-  };
+    void getCurrentWindow().close()
+  }
 
   return (
-    <header className="titlebar" data-tauri-drag-region>
-      <div className="titlebar-left">
-        <button
+    <header
+      className="bg-card/80 flex h-9 shrink-0 items-stretch border-b border-border backdrop-blur"
+      data-tauri-drag-region
+    >
+      <div className="flex items-center gap-0.5 px-2">
+        <Button
           type="button"
-          className="titlebar-icon-btn"
+          variant="ghost"
+          size="icon-sm"
           title="GitHub"
           aria-label="GitHub"
-          onClick={openGithub}
+          onClick={() => void openUrl(GITHUB_URL)}
         >
-          <span className="i-mdi-github text-16px" />
-        </button>
-        <button
+          <Icon icon="mdi:github" className="size-4" />
+        </Button>
+        <Button
           type="button"
-          className="titlebar-icon-btn"
+          variant="ghost"
+          size="icon-sm"
           title="设置"
           aria-label="设置"
-          onClick={onOpenSettings}
+          onClick={() => {
+            if (pathname !== "/settings") void navigate({ to: "/settings" })
+          }}
         >
-          <span className="i-mdi-cog-outline text-16px" />
-        </button>
+          <Icon icon="mdi:cog-outline" className="size-4" />
+        </Button>
       </div>
       <div
-        className="titlebar-drag"
+        className="min-w-6 flex-1"
         data-tauri-drag-region
         onDoubleClick={toggleMaximize}
       />
-      <div className="titlebar-right">
+      <div className="flex items-stretch">
         <button
           type="button"
-          className="titlebar-win-btn"
+          className="text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex w-11 items-center justify-center"
           title="最小化"
           aria-label="最小化"
           onClick={minimize}
         >
-          <span className="i-mdi-window-minimize text-14px" />
+          <Icon icon="mdi:window-minimize" className="size-3.5" />
         </button>
         <button
           type="button"
-          className="titlebar-win-btn"
+          className="text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex w-11 items-center justify-center"
           title={maximized ? "还原" : "最大化"}
           aria-label={maximized ? "还原" : "最大化"}
           onClick={toggleMaximize}
         >
-          <span
-            className={
-              maximized
-                ? "i-mdi-window-restore text-14px"
-                : "i-mdi-window-maximize text-14px"
-            }
+          <Icon
+            icon={maximized ? "mdi:window-restore" : "mdi:window-maximize"}
+            className="size-3.5"
           />
         </button>
         <button
           type="button"
-          className="titlebar-win-btn titlebar-win-btn-close"
+          className={cn(
+            "text-muted-foreground inline-flex w-11 items-center justify-center",
+            "hover:bg-destructive hover:text-white",
+          )}
           title="关闭"
           aria-label="关闭"
           onClick={close}
         >
-          <span className="i-mdi-close text-14px" />
+          <Icon icon="mdi:close" className="size-3.5" />
         </button>
       </div>
     </header>
-  );
+  )
 }

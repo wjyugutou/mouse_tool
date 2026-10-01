@@ -195,6 +195,7 @@ fn parse_bb(data: &[u8]) -> Option<u8> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_zustand::init())
         .invoke_handler(tauri::generate_handler![get_battery])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
