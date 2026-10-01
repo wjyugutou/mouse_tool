@@ -2,8 +2,9 @@
 import type { CloseBehavior, ThemeMode } from '@/stores/settings'
 import { Icon } from '@iconify/react'
 import { useNavigate } from '@tanstack/react-router'
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -30,10 +31,22 @@ export function SettingsPage() {
   const autoIntervalSec = useSettingsStore(s => s.autoIntervalSec)
   const themeMode = useSettingsStore(s => s.themeMode)
   const closeBehavior = useSettingsStore(s => s.closeBehavior)
+  const launchAtLogin = useSettingsStore(s => s.launchAtLogin)
   const setAutoIntervalSec = useSettingsStore(s => s.setAutoIntervalSec)
   const setThemeMode = useSettingsStore(s => s.setThemeMode)
   const setCloseBehavior = useSettingsStore(s => s.setCloseBehavior)
+  const setLaunchAtLogin = useSettingsStore(s => s.setLaunchAtLogin)
   const reset = useSettingsStore(s => s.reset)
+
+  // 与系统开机自启状态对齐一次
+  useEffect(() => {
+    void isEnabled()
+      .then((on) => {
+        if (on !== useSettingsStore.getState().launchAtLogin)
+          setLaunchAtLogin(on)
+      })
+      .catch(() => {})
+  }, [setLaunchAtLogin])
 
   const visibleSections = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -88,12 +101,25 @@ export function SettingsPage() {
                   autoIntervalSec={autoIntervalSec}
                   themeMode={themeMode}
                   closeBehavior={closeBehavior}
+                  launchAtLogin={launchAtLogin}
                   onAutoIntervalSecChange={setAutoIntervalSec}
                   onThemeModeChange={(mode) => {
                     setThemeMode(mode)
                     applyThemeFromStore(mode)
                   }}
                   onCloseBehaviorChange={setCloseBehavior}
+                  onLaunchAtLoginChange={async (on) => {
+                    try {
+                      if (on)
+                        await enable()
+                      else
+                        await disable()
+                      setLaunchAtLogin(on)
+                    }
+                    catch (e) {
+                      console.error('开机自启切换失败', e)
+                    }
+                  }}
                 />
               )
             : (
@@ -108,8 +134,16 @@ export function SettingsPage() {
             type="button"
             variant="ghost"
             onClick={() => {
-              reset()
-              applyThemeFromStore()
+              void (async () => {
+                try {
+                  await disable()
+                }
+                catch {
+                  // ignore
+                }
+                reset()
+                applyThemeFromStore()
+              })()
             }}
           >
             恢复默认
@@ -129,16 +163,20 @@ function AppearancePanel({
   autoIntervalSec,
   themeMode,
   closeBehavior,
+  launchAtLogin,
   onAutoIntervalSecChange,
   onThemeModeChange,
   onCloseBehaviorChange,
+  onLaunchAtLoginChange,
 }: {
   autoIntervalSec: number
   themeMode: ThemeMode
   closeBehavior: CloseBehavior
+  launchAtLogin: boolean
   onAutoIntervalSecChange: (sec: number) => void
   onThemeModeChange: (mode: ThemeMode) => void
   onCloseBehaviorChange: (behavior: CloseBehavior) => void
+  onLaunchAtLoginChange: (on: boolean) => void
 }) {
   const closeToTray = (closeBehavior ?? 'tray') === 'tray'
 
@@ -210,6 +248,23 @@ function AppearancePanel({
           <p className="text-muted-foreground text-xs">
             勾选后关闭窗口会进托盘；不勾选则直接退出。托盘可打开或退出。
           </p>
+
+        <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+          <span className="text-muted-foreground text-xs">开机自启</span>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <Checkbox
+              checked={launchAtLogin}
+              onCheckedChange={(checked) => {
+                onLaunchAtLoginChange(checked === true)
+              }}
+              aria-label="开机自启"
+            />
+            <span>开机时后台启动（不打开窗口）</span>
+          </label>
+          <p className="text-muted-foreground text-xs">
+            勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
+          </p>
+        </div>
         </div>
       </div>
     </div>

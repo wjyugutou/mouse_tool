@@ -16,7 +16,9 @@
         "width": 1200,
         "height": 644,
         "resizable": true,
-        "decorations": false
+        "decorations": false,
+        "visible": false,
+        "label": "main"
       }
     ],
     "security": {
