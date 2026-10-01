@@ -1,21 +1,21 @@
-export type BatteryInfo = {
-  percent: number | null;
-  charging: boolean | null;
-  connected: boolean;
-  device: string;
-  detail: string;
-};
+/** 设备适配器类型：前端统一用这套接口读电量。 */
+export interface BatteryInfo {
+  percent: number | null
+  charging: boolean | null
+  connected: boolean
+  device: string
+  detail: string
+}
 
-/** Adapter for a mouse (or other HID) device frontend. */
 export interface DeviceAdapter {
-  /** Stable id used as React key / selection value */
-  id: string;
-  /** Display name (Chinese UI) */
-  name: string;
-  /** Short description shown in the device list */
-  description: string;
-  /** Whether this adapter can attempt a battery read right now */
-  detect(): Promise<boolean>;
-  /** Read battery via Tauri invoke (or mock) */
-  readBattery(): Promise<BatteryInfo>;
+  /** 稳定 id，用作列表 key / 选中值 */
+  id: string
+  /** 界面显示名称 */
+  name: string
+  /** 列表里的短说明 */
+  description: string
+  /** 当前是否值得尝试读电量 */
+  detect: () => Promise<boolean>
+  /** 读电量（Tauri invoke 或 mock） */
+  readBattery: () => Promise<BatteryInfo>
 }

@@ -1,6 +1,7 @@
-import type { DeviceAdapter } from "@/devices"
-import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+/** 已注册设备列表；选中后右侧读对应 adapter。 */
+import type { DeviceAdapter } from '@/devices'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface Props {
   devices: DeviceAdapter[]
@@ -26,10 +27,10 @@ export function DeviceList({ devices, selectedId, onSelect }: Props) {
                   type="button"
                   onClick={() => onSelect(device.id)}
                   className={cn(
-                    "hover:bg-accent flex w-full flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                    'hover:bg-accent flex w-full flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left transition-colors',
                     selected
-                      ? "border-primary/55 bg-primary/15"
-                      : "border-transparent bg-muted/40",
+                      ? 'border-primary/55 bg-primary/15'
+                      : 'border-transparent bg-muted/40',
                   )}
                 >
                   <span className="text-sm font-semibold">{device.name}</span>

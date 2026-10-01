@@ -1,3 +1,4 @@
+//! 桌面入口：发布版隐藏 Windows 控制台窗口。
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 

@@ -1,11 +1,16 @@
-import process from 'node:process'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import react from '@vitejs/plugin-react'
-import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 const host = process.env.TAURI_DEV_HOST
+const pkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'),
+) as { version: string }
 
 export default defineConfig(() => ({
   plugins: [
@@ -18,6 +23,9 @@ export default defineConfig(() => ({
     tailwindcss(),
     react(),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

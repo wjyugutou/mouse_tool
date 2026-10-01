@@ -1,22 +1,24 @@
-import { useCallback, useEffect, useState } from "react"
-import { Icon } from "@iconify/react"
-import { useNavigate, useRouterState } from "@tanstack/react-router"
-import { openUrl } from "@tauri-apps/plugin-opener"
-import { getCurrentWindow } from "@tauri-apps/api/window"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+/** 无边框窗口标题栏：拖拽区、GitHub/设置、最小化/最大化/关闭。 */
+import { Icon } from '@iconify/react'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { useCallback, useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-const GITHUB_URL = "https://github.com/wjyugutou/mouse_tool"
+const GITHUB_URL = 'https://github.com/wjyugutou/mouse_tool'
 
 export function TitleBar() {
   const navigate = useNavigate()
-  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const pathname = useRouterState({ select: s => s.location.pathname })
   const [maximized, setMaximized] = useState(false)
 
   const syncMaximized = useCallback(async () => {
     try {
       setMaximized(await getCurrentWindow().isMaximized())
-    } catch {
+    }
+    catch {
       /* browser preview */
     }
   }, [])
@@ -29,7 +31,8 @@ export function TitleBar() {
         unlisten = await getCurrentWindow().onResized(() => {
           void syncMaximized()
         })
-      } catch {
+      }
+      catch {
         /* ignore */
       }
     })()
@@ -69,7 +72,8 @@ export function TitleBar() {
           title="设置"
           aria-label="设置"
           onClick={() => {
-            if (pathname !== "/settings") void navigate({ to: "/settings" })
+            if (pathname !== '/settings')
+              void navigate({ to: '/settings' })
           }}
         >
           <Icon icon="mdi:cog-outline" className="size-4" />
@@ -93,20 +97,20 @@ export function TitleBar() {
         <button
           type="button"
           className="text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex w-11 items-center justify-center"
-          title={maximized ? "还原" : "最大化"}
-          aria-label={maximized ? "还原" : "最大化"}
+          title={maximized ? '还原' : '最大化'}
+          aria-label={maximized ? '还原' : '最大化'}
           onClick={toggleMaximize}
         >
           <Icon
-            icon={maximized ? "mdi:window-restore" : "mdi:window-maximize"}
+            icon={maximized ? 'mdi:window-restore' : 'mdi:window-maximize'}
             className="size-3.5"
           />
         </button>
         <button
           type="button"
           className={cn(
-            "text-muted-foreground inline-flex w-11 items-center justify-center",
-            "hover:bg-destructive hover:text-white",
+            'text-muted-foreground inline-flex w-11 items-center justify-center',
+            'hover:bg-destructive hover:text-white',
           )}
           title="关闭"
           aria-label="关闭"

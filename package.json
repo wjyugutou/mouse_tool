@@ -1,13 +1,16 @@
 {
   "name": "tauri-app",
-  "private": true,
-  "version": "0.1.0",
   "type": "module",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/sync-version.mjs && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "version:sync": "node scripts/sync-version.mjs"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",

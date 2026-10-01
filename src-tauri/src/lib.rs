@@ -1,3 +1,9 @@
+//! 鼠标工具 · 后端（Tauri）
+//!
+//! - 通过 HID 被动读取雷柏 VT9 AIR 电量（勿用 GetInputReport，会卡死鼠标）
+//! - 系统托盘 + 关闭窗口行为（退出 / 隐藏到托盘）由前端 zustand 设置驱动
+
+use tauri::Manager;
 use hidapi::HidApi;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -7,9 +13,10 @@ const RAPOO_VID: u16 = 0x24ae;
 const CANDIDATE_PIDS: &[u16] = &[0x1200, 0x4400];
 const REPORT_BB: u8 = 0xBB;
 const REPORT_BC: u8 = 0xBC;
-/// Capture shows BB on interrupt EP 0x84 about every 3s while host has a read posted.
+/// 官方软件挂起中断读时，设备约每 3 秒推一次 BB；我们最多等这么久。
 const LISTEN_FOR: Duration = Duration::from_millis(4500);
 
+/// 电量读取结果，经 `get_battery` 命令返回前端。
 #[derive(Serialize, Clone)]
 struct BatteryInfo {
     percent: Option<u8>,
@@ -19,6 +26,7 @@ struct BatteryInfo {
     detail: String,
 }
 
+/// 前端调用的电量命令；HID 同步 IO 放到阻塞线程，避免卡住 UI。
 #[tauri::command]
 async fn get_battery() -> BatteryInfo {
     match tauri::async_runtime::spawn_blocking(read_vt9_battery).await {
@@ -40,6 +48,7 @@ async fn get_battery() -> BatteryInfo {
     }
 }
 
+/// 打开厂商 HID 集合，仅被动 `read_timeout` 等 0xBB 报告。
 fn read_vt9_battery() -> Result<BatteryInfo, String> {
     let api = HidApi::new().map_err(|e| format!("hidapi 初始化失败: {e}"))?;
 
@@ -59,6 +68,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         iface_summary.push(format!(
             "pid={pid:04X} if={iface} up=0x{usage_page:04X} u=0x{usage:04X}"
         ));
+        // 厂商页 FF00 / usage 0002：电量所在集合
         if usage_page == 0xFF00 && usage == 0x0002 && seen.insert(path.clone()) {
             vendor_paths.push((pid, iface, path));
         }
@@ -116,9 +126,8 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
             continue;
         }
 
-        // From pcap: host only posts interrupt reads on EP 0x84;
-        // device pushes `bb b0 .. .. .. .. pct` about every 3 seconds.
-        // Never use GetInputReport (control pipe → 0x1F stalls mouse).
+        // 抓包结论：只挂中断读（EP 0x84），设备推 `bb … pct`。
+        // 切勿 GetInputReport / Feature 刷控制传输，会导致鼠标卡死（0x1F）。
         let mut buf = [0u8; 64];
         let deadline = Instant::now() + LISTEN_FOR;
         while Instant::now() < deadline {
@@ -181,7 +190,7 @@ fn parse_bb(data: &[u8]) -> Option<u8> {
     if data.is_empty() || data[0] != REPORT_BB {
         return None;
     }
-    // Capture sample: bb b0 51 c4 09 01 38 → 56%
+    // 抓包样例：bb b0 51 c4 09 01 38 → 电量在第 7 字节（56%）
     if data.len() >= 7 {
         let percent = data[6];
         if percent <= 100 {
@@ -191,11 +200,80 @@ fn parse_bb(data: &[u8]) -> Option<u8> {
     None
 }
 
+
+/// 从托盘恢复并聚焦主窗口。
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// 读取前端持久化的关闭行为：`quit` | `tray`（默认托盘）。
+fn close_behavior(app: &tauri::AppHandle) -> String {
+    use tauri_plugin_zustand::ManagerExt;
+    app.zustand()
+        .get_or::<String>("settings", "closeBehavior", "tray".into())
+}
+
+/// 创建托盘：左键显示窗口；菜单可显示 / 退出。
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    let Some(icon) = app.default_window_icon().cloned() else {
+        eprintln!("no default window icon; skip tray");
+        return Ok(());
+    };
+
+    TrayIconBuilder::new()
+        .icon(icon)
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .tooltip("鼠标工具")
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "show" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 插件、托盘、关窗拦截、命令注册
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_zustand::init())
+        .setup(|app| {
+            setup_tray(app)?;
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 设置为「隐藏到托盘」时：关窗只隐藏，进程继续跑
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if close_behavior(window.app_handle()) == "tray" {
+                    let _ = window.hide();
+                    api.prevent_close();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![get_battery])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
