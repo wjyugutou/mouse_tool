@@ -1,5 +1,5 @@
 {
-  "productName": "VT9 AIR 电量",
+  "productName": "鼠标工具",
   "version": "0.1.0",
   "identifier": "com.wwwj.mousetool",
   "build": {
@@ -12,10 +12,11 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "VT9 AIR 电量",
-        "width": 400,
-        "height": 420,
-        "resizable": false
+        "title": "鼠标工具",
+        "width": 1200,
+        "height": 644,
+        "resizable": true,
+        "decorations": false
       }
     ],
     "security": {

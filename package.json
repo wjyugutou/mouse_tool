@@ -10,18 +10,25 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tanstack/react-router": "^1.170.40",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^9.5.1",
+    "@eslint-react/eslint-plugin": "^5.23.1",
+    "@iconify-json/mdi": "^1.2.3",
     "@tauri-apps/cli": "^2",
     "@types/node": "^26.6.3",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-refresh": "^0.5.7",
     "typescript": "~6.0.3",
+    "unocss": "^66.10.5",
     "vite": "^8.3.1"
   }
 }
