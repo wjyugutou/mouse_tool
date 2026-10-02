@@ -6,6 +6,7 @@
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const ver = process.argv[2]
@@ -18,7 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const pkgPath = join(root, 'package.json')
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
 pkg.version = ver
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`)
 
 const r = spawnSync(process.execPath, [join(root, 'scripts/sync-version.mjs')], {
   stdio: 'inherit',
