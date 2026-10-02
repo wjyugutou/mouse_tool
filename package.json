@@ -1,7 +1,7 @@
 {
   "name": "tauri-app",
   "type": "module",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "lint:fix": "eslint . --fix",
     "version:sync": "node scripts/sync-version.mjs",
     "build:app": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-build.ps1",
-    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-build.ps1"
+    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-build.ps1",
+    "release:bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
