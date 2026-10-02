@@ -48,4 +48,4 @@ jobs:
           releaseBody: Download installers from Assets. In-app updater uses latest.json.
           releaseDraft: true
           prerelease: false
-          updaterJsonPreferNsis: true
+          updaterJsonPreferNsis: false

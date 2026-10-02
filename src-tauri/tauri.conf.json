@@ -28,7 +28,6 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
       "msi"
     ],
     "icon": [
@@ -41,13 +40,6 @@
     "windows": {
       "wix": {
         "language": "zh-CN"
-      },
-      "nsis": {
-        "languages": [
-          "SimpChinese",
-          "English"
-        ],
-        "displayLanguageSelector": false
       }
     },
     "createUpdaterArtifacts": true
