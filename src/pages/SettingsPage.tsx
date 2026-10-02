@@ -2,8 +2,11 @@
 import type { CloseBehavior, ThemeMode } from '@/stores/settings'
 import { Icon } from '@iconify/react'
 import { useNavigate } from '@tanstack/react-router'
+import { invoke } from '@tauri-apps/api/core'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { openUrl } from '@tauri-apps/plugin-opener'
+import { openPath, openUrl } from '@tauri-apps/plugin-opener'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { check } from '@tauri-apps/plugin-updater'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -249,22 +252,22 @@ function AppearancePanel({
             勾选后关闭窗口会进托盘；不勾选则直接退出。托盘可打开或退出。
           </p>
 
-        <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
-          <span className="text-muted-foreground text-xs">开机自启</span>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <Checkbox
-              checked={launchAtLogin}
-              onCheckedChange={(checked) => {
-                onLaunchAtLoginChange(checked === true)
-              }}
-              aria-label="开机自启"
-            />
-            <span>开机时后台启动（不打开窗口）</span>
-          </label>
-          <p className="text-muted-foreground text-xs">
-            勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
-          </p>
-        </div>
+          <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+            <span className="text-muted-foreground text-xs">开机自启</span>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={launchAtLogin}
+                onCheckedChange={(checked) => {
+                  onLaunchAtLoginChange(checked === true)
+                }}
+                aria-label="开机自启"
+              />
+              <span>开机时后台启动（不打开窗口）</span>
+            </label>
+            <p className="text-muted-foreground text-xs">
+              勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -272,6 +275,38 @@ function AppearancePanel({
 }
 
 function AboutPanel() {
+  const [logPath, setLogPath] = useState('')
+  const [updateMsg, setUpdateMsg] = useState('')
+  const [updating, setUpdating] = useState(false)
+
+  async function onCheckUpdate() {
+    setUpdating(true)
+    setUpdateMsg('正在检查…')
+    try {
+      const update = await check()
+      if (!update) {
+        setUpdateMsg('已是最新版本')
+        return
+      }
+      setUpdateMsg(`发现 ${update.version}，正在下载安装…`)
+      await update.downloadAndInstall()
+      setUpdateMsg('安装完成，即将重启…')
+      await relaunch()
+    }
+    catch (e) {
+      setUpdateMsg(`检查失败：${e instanceof Error ? e.message : String(e)}`)
+    }
+    finally {
+      setUpdating(false)
+    }
+  }
+
+  useEffect(() => {
+    void invoke<string>('get_log_path')
+      .then(setLogPath)
+      .catch(() => setLogPath(''))
+  }, [])
+
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-semibold">关于</h2>
@@ -288,6 +323,44 @@ function AboutPanel() {
       >
         github.com/wjyugutou/mouse_tool
       </button>
+      <div className="space-y-2 pt-2">
+        <p className="text-muted-foreground text-xs">运行日志（查开机闪退）</p>
+        <p className="text-muted-foreground break-all font-mono text-xs">
+          {logPath || '读取中…'}
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={!logPath}
+          onClick={() => {
+            if (!logPath)
+              return
+            // 打开日志所在目录
+            const dir = logPath.replace(/[\\/][^\\/]+$/, '')
+            void openPath(dir).catch(() => openPath(logPath))
+          }}
+        >
+          打开日志目录
+        </Button>
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-muted-foreground text-xs">应用更新（GitHub Releases）</p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={updating}
+            onClick={() => void onCheckUpdate()}
+          >
+            {updating ? '处理中…' : '检查更新'}
+          </Button>
+          {updateMsg
+            ? (
+                <p className="text-muted-foreground text-xs">{updateMsg}</p>
+              )
+            : null}
+        </div>
+      </div>
     </div>
   )
 }

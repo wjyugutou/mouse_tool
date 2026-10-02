@@ -1,4 +1,14 @@
-packages:
-  - .
+minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - '@tauri-apps/plugin-autostart'
+  - '@tauri-apps/plugin-process'
+  - '@tauri-apps/plugin-updater'
+
+# semver@6.x 发布早于 provenance，相对后续带 attestation 的版本会被 no-downgrade 误拦
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - semver@6.3.1
+shellEmulator: true
+
+packages:
+  - .

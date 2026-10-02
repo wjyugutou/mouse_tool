@@ -23,6 +23,10 @@
     "zustand:default",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    "opener:allow-open-path",
+    "opener:allow-reveal-item-in-dir",
+    "updater:default",
+    "process:default"
   ]
 }

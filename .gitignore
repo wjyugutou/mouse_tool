@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Updater signing keys (never commit)
+*.key
+*.key.pub
+
+# local updater signing
+.env.local
+*.key
+!*.key.pub
+
+mouse_tool_updater_keys
