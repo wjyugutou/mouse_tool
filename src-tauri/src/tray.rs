@@ -10,8 +10,19 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
-/// 托盘后台刷新间隔（含一次 HID 监听，不宜过短）。
-const TRAY_REFRESH: Duration = Duration::from_secs(300);
+/// Same source as frontend settings.autoIntervalSec (DEFAULT = 300).
+const DEFAULT_AUTO_INTERVAL_SEC: u64 = 300;
+
+/// Read auto refresh interval (seconds) from zustand settings store.
+fn auto_interval_sec(app: &AppHandle) -> u64 {
+    use tauri_plugin_zustand::ManagerExt;
+    let raw = app.zustand().get_or::<u64>(
+        "settings",
+        "autoIntervalSec",
+        DEFAULT_AUTO_INTERVAL_SEC,
+    );
+    raw.clamp(3, 300)
+}
 
 struct TrayUiState {
     /// 当前托盘展示哪只鼠标的电量
@@ -353,7 +364,9 @@ fn spawn_tray_updater(app: AppHandle) {
         std::thread::sleep(Duration::from_secs(2));
         loop {
             refresh_tray_battery(&app);
-            std::thread::sleep(TRAY_REFRESH);
+            // Re-read settings each loop so Settings changes apply next sleep
+            let secs = auto_interval_sec(&app);
+            std::thread::sleep(Duration::from_secs(secs));
         }
     });
 }
