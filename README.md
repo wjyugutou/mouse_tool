@@ -1,12 +1,13 @@
 # 鼠标工具（mouse_tool）
 
-用 Tauri + React 做的 Windows 桌面小工具：显示雷柏 **VT9 AIR** 电量，不依赖雷柏 GameDev 常驻运行。
+用 Tauri + React 做的 Windows 桌面小工具：读取雷柏 **VT9 AIR** 电量，不依赖雷柏 GameDev 常驻运行。设备列表里还有雷蛇 **毒蝰终极版（Viper Ultimate）**，但这只鼠标的已知电量协议要走 Feature 报告，当前不会读取。
 
 仓库：https://github.com/wjyugutou/mouse_tool
 
 ## 功能
 
-- 被动读取 HID 电量（Report `0xBB`，勿用 GetInputReport，会卡鼠标）
+- 被动读取 VT9 AIR 的 HID 电量（Report `0xBB`，勿用 GetInputReport，会卡鼠标）
+- 毒蝰终极版：只识别有线 `1532:007A` / 接收器 `1532:007B`，不读电量（见下方设备插件）
 - 托盘图标显示电量；左键选设备，双击打开主窗口
 - 设置：主题、刷新间隔、关窗隐藏到托盘 / 退出、开机自启
 - 应用内检查更新（GitHub Releases + `latest.json`）
@@ -81,6 +82,8 @@ pnpm build:app
 4. 在 `src-tauri/src/devices/mod.rs` 的 `PLUGINS` 追加一行。
 
 `list_devices` 返回这份 Rust 插件表，便于对照前端注册的 id。
+
+已注册：`vt9-air`（会读电量）、`razer-viper-ultimate`（只识别设备）。毒蝰终极版的 OpenRazer 路径是 Feature `SET_REPORT` 再 `GET_REPORT`（class `0x07` / cmd `0x80`，transaction `0xFF`），本工具不发送这类传输。
 
 ## 后端结构
 
