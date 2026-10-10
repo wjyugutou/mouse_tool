@@ -12,7 +12,7 @@ mod tray;
 
 use devices::{get_battery, list_devices};
 use tauri::Manager;
-use tray::{close_behavior, setup_tray};
+use tray::{close_behavior, set_tray_device, setup_tray};
 
 /// 返回日志文件绝对路径，供设置页展示 / 打开目录。
 #[tauri::command]
@@ -74,7 +74,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_battery,
             list_devices,
-            get_log_path
+            get_log_path,
+            set_tray_device
         ])
         .run(tauri::generate_context!());
 

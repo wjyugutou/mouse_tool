@@ -70,6 +70,20 @@ fn set_selected_tray_device(app: &AppHandle, id: &str) {
             *guard = id.to_string();
         }
     }
+    // 与前端 settings.trayDeviceId 同源，主窗口选设备 / 托盘菜单都能持久化
+    use tauri_plugin_zustand::ManagerExt;
+    let _ = app.zustand().patch(
+        "settings",
+        [("trayDeviceId", id.to_string())],
+    );
+}
+
+/// 主窗口选中设备时调用：更新托盘目标并立刻刷新图标 / 提示。
+#[tauri::command]
+pub fn set_tray_device(app: AppHandle, device_id: String) {
+    let id = resolve_stored_device_id(device_id);
+    set_selected_tray_device(&app, &id);
+    refresh_tray_battery(&app);
 }
 
 /// 3×5 像素数字字模，用于托盘图标画电量。

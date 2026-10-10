@@ -1,5 +1,6 @@
 /** 首页：设备列表 + 电量卡片，按设置间隔自动刷新。 */
 import type { BatteryInfo } from '@/devices'
+import { invoke } from '@tauri-apps/api/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BatteryCard } from '@/components/BatteryCard'
 import { DeviceList } from '@/components/DeviceList'
@@ -12,9 +13,11 @@ import { useSettingsStore } from '@/stores/settings'
 
 export function HomePage() {
   const autoIntervalSec = useSettingsStore(s => s.autoIntervalSec)
-  const [selectedId, setSelectedId] = useState(
-    () => deviceRegistry[0]?.id ?? '',
-  )
+  const setTrayDeviceId = useSettingsStore(s => s.setTrayDeviceId)
+  const [selectedId, setSelectedId] = useState(() => {
+    const stored = useSettingsStore.getState().trayDeviceId
+    return getDeviceById(stored)?.id ?? deviceRegistry[0]?.id ?? ''
+  })
   const [info, setInfo] = useState<BatteryInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -93,6 +96,8 @@ export function HomePage() {
         selectedId={selected.id}
         onSelect={(id) => {
           setSelectedId(id)
+          setTrayDeviceId(id)
+          void invoke('set_tray_device', { deviceId: id }).catch(() => {})
           setInfo(null)
           setError(null)
           setAuto(true)
