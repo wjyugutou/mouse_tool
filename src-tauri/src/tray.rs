@@ -11,7 +11,7 @@ use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
 /// 托盘后台刷新间隔（含一次 HID 监听，不宜过短）。
-const TRAY_REFRESH: Duration = Duration::from_secs(20);
+const TRAY_REFRESH: Duration = Duration::from_secs(300);
 
 struct TrayUiState {
     /// 当前托盘展示哪只鼠标的电量

@@ -22,18 +22,18 @@ interface SettingsState {
   reset: () => void
 }
 
-const DEFAULT_AUTO_INTERVAL_SEC = 5
+const DEFAULT_AUTO_INTERVAL_SEC = 300
 const DEFAULT_THEME_MODE: ThemeMode = 'dark'
 const DEFAULT_CLOSE_BEHAVIOR: CloseBehavior = 'tray'
 /** 默认托盘鼠标取插件表第一项，避免再写一份设备 id。 */
 const DEFAULT_TRAY_DEVICE_ID = deviceRegistry[0]?.id ?? ''
 const DEFAULT_LAUNCH_AT_LOGIN = false
 
-/** 刷新间隔限制在 3～60 秒 */
+/** 刷新间隔限制在 3～300 秒 */
 function clampInterval(n: number): number {
   if (!Number.isFinite(n))
     return DEFAULT_AUTO_INTERVAL_SEC
-  return Math.min(60, Math.max(3, Math.round(n)))
+  return Math.min(300, Math.max(3, Math.round(n)))
 }
 
 export const useSettingsStore = create<SettingsState>(set => ({
