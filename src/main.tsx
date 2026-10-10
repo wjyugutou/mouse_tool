@@ -8,7 +8,7 @@ import {
   settingsTauriStore,
   useSettingsStore,
 } from './stores/settings'
-import './index.css'
+import './styles/index.css'
 
 const router = createRouter({
   routeTree,
