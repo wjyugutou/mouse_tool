@@ -1,7 +1,8 @@
 //! 系统托盘：电量图标、设备菜单、后台刷新
 
 use crate::app_log;
-use crate::battery::{read_battery_for_device, BatteryInfo};
+use crate::devices;
+use crate::plugin_sdk::BatteryInfo;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::image::Image;
@@ -12,21 +13,30 @@ use tauri::{AppHandle, Manager};
 /// 托盘后台刷新间隔（含一次 HID 监听，不宜过短）。
 const TRAY_REFRESH: Duration = Duration::from_secs(20);
 
-/// 托盘可选设备（与前端 deviceRegistry 对齐，后续在此扩展）。
-const TRAY_DEVICES: &[(&str, &str)] = &[("vt9-air", "VT9 AIR")];
-const DEFAULT_TRAY_DEVICE: &str = "vt9-air";
-
 struct TrayUiState {
     /// 当前托盘展示哪只鼠标的电量
     selected_id: Mutex<String>,
 }
 
-fn device_name(id: &str) -> &str {
-    TRAY_DEVICES
-        .iter()
-        .find(|(did, _)| *did == id)
-        .map(|(_, name)| *name)
-        .unwrap_or(id)
+/// 托盘菜单与电量都走设备插件表，不在这里维护第二份 id / 名称。
+fn device_name(id: &str) -> String {
+    devices::device_name(id)
+}
+
+fn resolve_stored_device_id(stored: String) -> String {
+    if devices::find(&stored).is_some() {
+        stored
+    } else {
+        devices::default_device_id()
+    }
+}
+
+fn read_stored_tray_device_id(app: &AppHandle) -> String {
+    use tauri_plugin_zustand::ManagerExt;
+    let stored =
+        app.zustand()
+            .get_or::<String>("settings", "trayDeviceId", devices::default_device_id());
+    resolve_stored_device_id(stored)
 }
 
 /// 从托盘恢复并聚焦主窗口。
@@ -51,9 +61,7 @@ fn selected_tray_device(app: &AppHandle) -> String {
             return id.clone();
         }
     }
-    use tauri_plugin_zustand::ManagerExt;
-    app.zustand()
-        .get_or::<String>("settings", "trayDeviceId", DEFAULT_TRAY_DEVICE.into())
+    read_stored_tray_device_id(app)
 }
 
 fn set_selected_tray_device(app: &AppHandle, id: &str) {
@@ -267,15 +275,22 @@ fn build_tray_menu(app: &AppHandle, selected_id: &str) -> tauri::Result<Menu<tau
     let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
     // CheckMenuItem 需要活过 build，放到 owned 列表
     let mut checks = Vec::new();
-    for (id, name) in TRAY_DEVICES {
-        let checked = *id == selected_id;
+    for plugin in devices::plugins() {
+        let meta = plugin.meta();
+        let checked = meta.id == selected_id;
         let label = if checked {
-            format!("✓ {name}")
+            format!("✓ {}", meta.name)
         } else {
-            (*name).to_string()
+            meta.name
         };
         // 用普通 MenuItem + 勾选前缀，避免 CheckMenuItem 生命周期麻烦
-        let item = MenuItem::with_id(app, format!("device:{id}"), label, true, None::<&str>)?;
+        let item = MenuItem::with_id(
+            app,
+            format!("device:{}", meta.id),
+            label,
+            true,
+            None::<&str>,
+        )?;
         checks.push(item);
     }
     for c in &checks {
@@ -308,7 +323,7 @@ fn apply_tray_status(app: &AppHandle, info: &BatteryInfo, selected_id: &str) {
 
 fn refresh_tray_battery(app: &AppHandle) {
     let id = selected_tray_device(app);
-    let info = read_battery_for_device(&id);
+    let info = devices::read_battery(&id);
     if !info.connected {
         app_log::warn(&format!(
             "tray battery device={id} disconnected detail={}",
@@ -332,11 +347,7 @@ fn spawn_tray_updater(app: AppHandle) {
 /// 创建托盘：图标/提示显示电量；单击弹出设备列表；双击打开窗口。
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     app_log::info("setup_tray begin");
-    let selected = {
-        use tauri_plugin_zustand::ManagerExt;
-        app.zustand()
-            .get_or::<String>("settings", "trayDeviceId", DEFAULT_TRAY_DEVICE.into())
-    };
+    let selected = read_stored_tray_device_id(app.handle());
     app.manage(TrayUiState {
         selected_id: Mutex::new(selected.clone()),
     });

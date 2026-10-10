@@ -2,6 +2,8 @@
 import { createTauriStore } from '@tauri-store/zustand'
 import { create } from 'zustand'
 
+import { deviceRegistry } from '@/devices'
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 export type CloseBehavior = 'quit' | 'tray'
 
@@ -23,7 +25,8 @@ interface SettingsState {
 const DEFAULT_AUTO_INTERVAL_SEC = 5
 const DEFAULT_THEME_MODE: ThemeMode = 'dark'
 const DEFAULT_CLOSE_BEHAVIOR: CloseBehavior = 'tray'
-const DEFAULT_TRAY_DEVICE_ID = 'vt9-air'
+/** 默认托盘鼠标取插件表第一项，避免再写一份设备 id。 */
+const DEFAULT_TRAY_DEVICE_ID = deviceRegistry[0]?.id ?? ''
 const DEFAULT_LAUNCH_AT_LOGIN = false
 
 /** 刷新间隔限制在 3～60 秒 */

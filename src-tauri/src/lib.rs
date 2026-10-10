@@ -1,13 +1,16 @@
 //! 鼠标工具 · 后端（Tauri）
 //!
-//! - 通过 HID 被动读取雷柏 VT9 AIR 电量（勿用 GetInputReport，会卡死鼠标）
+//! - 设备电量由构建期插件提供（`devices::PLUGINS`），命令是 `get_battery(device_id)`
+//! - 只允许 HID 中断读；勿用 GetInputReport，会卡死鼠标
 //! - 托盘显示电量：单击选鼠标，双击打开主窗口；关窗可隐藏到托盘
+//! - 设置、更新、日志留在壳层，不做成插件
 
 mod app_log;
-mod battery;
+mod devices;
+mod plugin_sdk;
 mod tray;
 
-use battery::get_battery;
+use devices::{get_battery, list_devices};
 use tauri::Manager;
 use tray::{close_behavior, setup_tray};
 
@@ -68,7 +71,11 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![get_battery, get_log_path])
+        .invoke_handler(tauri::generate_handler![
+            get_battery,
+            list_devices,
+            get_log_path
+        ])
         .run(tauri::generate_context!());
 
     if let Err(e) = result {
