@@ -1,0 +1,15 @@
+.root {
+  flex-shrink: 0;
+  background-color: var(--border);
+  border: none;
+}
+
+.root[data-orientation='horizontal'] {
+  height: 1px;
+  width: 100%;
+}
+
+.root[data-orientation='vertical'] {
+  height: 100%;
+  width: 1px;
+}
