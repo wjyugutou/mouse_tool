@@ -62,11 +62,33 @@ pnpm build:app
 
 **Latest Release 必须带 `latest.json`**；空的 Latest 或长期 Draft 会导致应用内检查失败。
 
+## 设备插件
+
+一只鼠标是一个**构建期**设备包，不是运行时下载的插件：
+
+- 前端 `DeviceAdapter`（`src/plugins/<id>/`）
+- 对应的 Rust HID 读取（`src-tauri/src/devices/<id>.rs`）
+
+窗口、设置、托盘壳、日志、更新留在壳层。命令在 `generate_handler!` 里静态注册，不加载 DLL。
+
+电量只有一条壳层命令：`get_battery(device_id)`。`device_id` 与前端适配器的 `id` 来自同一份 `manifest.json`。托盘菜单也读 Rust 的 `PLUGINS`，不再单独维护设备表。
+
+### 再加一只鼠标
+
+1. 复制 `src/plugins/vt9-air/`，改 `manifest.json`（`id` / `name` / `description` 只写在这里）。
+2. 在 `src/plugins/index.ts` 的 `deviceRegistry` 追加一行。首页不用改。
+3. 在 `src-tauri/src/devices/` 增加模块（文件名用下划线，例如 `vt9_air.rs`）。只做中断 `read_timeout`，不要用 GetInputReport / Feature（会卡死鼠标）。`manifest_json` 用 `include_str!` 指向上面同一个 `manifest.json`。
+4. 在 `src-tauri/src/devices/mod.rs` 的 `PLUGINS` 追加一行。
+
+`list_devices` 返回这份 Rust 插件表，便于对照前端注册的 id。
+
 ## 后端结构
 
-- `src-tauri/src/battery.rs` — HID 读电量
-- `src-tauri/src/tray.rs` — 托盘
+- `src-tauri/src/plugin_sdk.rs` — 插件契约（`DevicePlugin` / `BatteryInfo`）
+- `src-tauri/src/devices/` — 插件注册表与各鼠标的 HID 实现
+- `src-tauri/src/tray.rs` — 托盘壳（设备列表来自插件表）
 - `src-tauri/src/app_log.rs` — 文件日志
-- `src-tauri/src/lib.rs` — 启动与插件注册
-
-前端设备扩展：`src/devices/`。
+- `src-tauri/src/lib.rs` — 启动与命令注册
+- `src/plugin-sdk/` — 前端契约与 `createDeviceAdapter`
+- `src/plugins/` — 已安装的设备插件
+- `src/devices/` — 壳层重新导出，页面继续从这里取注册表

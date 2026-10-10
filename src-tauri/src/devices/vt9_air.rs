@@ -1,9 +1,9 @@
-//! HID 电量读取（雷柏 VT9 AIR）
+//! 雷柏 VT9 AIR 电量插件。
 //!
-//! 只被动 `read_timeout` 等 0xBB；勿用 GetInputReport / Feature，会卡死鼠标。
+//! 只被动 `read_timeout` 等 0xBB。勿用 GetInputReport / Feature，会卡死鼠标。
 
+use crate::plugin_sdk::{parse_manifest, BatteryInfo, DevicePlugin};
 use hidapi::HidApi;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
@@ -14,40 +14,17 @@ const REPORT_BC: u8 = 0xBC;
 /// 官方软件挂起中断读时，设备约每 3 秒推一次 BB；我们最多等这么久。
 const LISTEN_FOR: Duration = Duration::from_millis(4500);
 
-#[derive(Serialize, Clone)]
-pub struct BatteryInfo {
-    pub percent: Option<u8>,
-    pub charging: Option<bool>,
-    pub connected: bool,
-    pub device: String,
-    pub detail: String,
-}
+const MANIFEST_JSON: &str = include_str!("../../../src/plugins/vt9-air/manifest.json");
 
-/// 前端调用的电量命令；HID 同步 IO 放到阻塞线程，避免卡住 UI。
-#[tauri::command]
-pub async fn get_battery() -> BatteryInfo {
-    match tauri::async_runtime::spawn_blocking(read_vt9_battery).await {
-        Ok(Ok(info)) => info,
-        Ok(Err(err)) => BatteryInfo {
-            percent: None,
-            charging: None,
-            connected: false,
-            device: "VT9 AIR".into(),
-            detail: err,
-        },
-        Err(e) => BatteryInfo {
-            percent: None,
-            charging: None,
-            connected: false,
-            device: "VT9 AIR".into(),
-            detail: format!("读取任务失败: {e}"),
-        },
-    }
-}
+pub static PLUGIN: DevicePlugin = DevicePlugin {
+    manifest_json: MANIFEST_JSON,
+    read_battery: read_vt9_battery,
+};
 
 /// 打开厂商 HID 集合，仅被动 `read_timeout` 等 0xBB 报告。
 fn read_vt9_battery() -> Result<BatteryInfo, String> {
     let api = HidApi::new().map_err(|e| format!("hidapi 初始化失败: {e}"))?;
+    let device_label = parse_manifest(MANIFEST_JSON).name;
 
     let mut seen = HashSet::new();
     let mut iface_summary = Vec::new();
@@ -77,7 +54,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
             percent: None,
             charging: None,
             connected: false,
-            device: "VT9 AIR".into(),
+            device: device_label,
             detail: "未找到 Rapoo 接收器。若刚卡死过，请拔插接收器。".into(),
         });
     }
@@ -174,7 +151,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         percent: None,
         charging: None,
         connected: true,
-        device: "VT9 AIR".into(),
+        device: device_label,
         detail: format!("未找到含 Report 0xBB 的集合。接口: {summary}"),
     })
 }
@@ -200,21 +177,33 @@ fn parse_bb(data: &[u8]) -> Option<u8> {
     None
 }
 
-pub fn read_battery_for_device(device_id: &str) -> BatteryInfo {
-    match device_id {
-        "vt9-air" => read_vt9_battery().unwrap_or_else(|e| BatteryInfo {
-            percent: None,
-            charging: None,
-            connected: false,
-            device: "VT9 AIR".into(),
-            detail: e,
-        }),
-        _ => BatteryInfo {
-            percent: None,
-            charging: None,
-            connected: false,
-            device: device_id.into(),
-            detail: format!("未知设备: {device_id}"),
-        },
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_captured_bb_report() {
+        // 抓包样例：第 7 字节 0x38 = 56%
+        assert_eq!(
+            parse_bb(&[0xbb, 0xb0, 0x51, 0xc4, 0x09, 0x01, 0x38]),
+            Some(56)
+        );
+    }
+
+    #[test]
+    fn rejects_incomplete_or_out_of_range_reports() {
+        assert_eq!(parse_bb(&[]), None);
+        assert_eq!(parse_bb(&[0xbc, 0, 0, 0, 0, 0, 10]), None);
+        assert_eq!(parse_bb(&[0xbb, 0, 0, 0, 0, 0]), None);
+        assert_eq!(parse_bb(&[0xbb, 0, 0, 0, 0, 0, 101]), None);
+        assert_eq!(parse_bb(&[0xbb, 0, 0, 0, 0, 0, 0]), Some(0));
+        assert_eq!(parse_bb(&[0xbb, 0, 0, 0, 0, 0, 100]), Some(100));
+    }
+
+    #[test]
+    fn manifest_is_the_plugin_identity() {
+        let meta = PLUGIN.meta();
+        assert_eq!(meta.id, "vt9-air");
+        assert_eq!(meta.name, "VT9 AIR");
     }
 }
