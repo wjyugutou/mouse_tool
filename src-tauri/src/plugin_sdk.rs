@@ -39,7 +39,9 @@ impl BatteryInfo {
 pub struct DevicePlugin {
     /// `include_str!` 进来的 manifest，与前端插件目录是同一个文件。
     pub manifest_json: &'static str,
-    /// 被动读取电量。禁止在实现里调用 GetInputReport / Feature。
+    /// 读取电量。默认只做中断读。
+    /// Feature 报告只允许模块文档写明 opt-in 的插件使用（雷蛇）。
+    /// 雷柏 VT9 禁止 Feature / `GetInputReport`。
     pub read_battery: fn() -> Result<BatteryInfo, String>,
 }
 

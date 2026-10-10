@@ -1,12 +1,13 @@
 # 鼠标工具（mouse_tool）
 
-用 Tauri + React 做的 Windows 桌面小工具：显示雷柏 **VT9 AIR** 电量，不依赖雷柏 GameDev 常驻运行。
+用 Tauri + React 做的 Windows 桌面小工具：读取雷柏 **VT9 AIR** 与雷蛇 **毒蝰终极版（Viper Ultimate）** 的电量。VT9 不依赖雷柏 GameDev 常驻运行。
 
 仓库：https://github.com/wjyugutou/mouse_tool
 
 ## 功能
 
-- 被动读取 HID 电量（Report `0xBB`，勿用 GetInputReport，会卡鼠标）
+- VT9 AIR：被动中断读 HID 电量（Report `0xBB`）。不要对它用 GetInputReport / Feature，会卡鼠标
+- 毒蝰终极版：有线 `1532:007A` / 接收器 `1532:007B`，按 OpenRazer 发 Feature `SET_REPORT` / `GET_REPORT`（class `0x07` cmd `0x80`）
 - 托盘图标显示电量；左键选设备，双击打开主窗口
 - 设置：主题、刷新间隔、关窗隐藏到托盘 / 退出、开机自启
 - 应用内检查更新（GitHub Releases + `latest.json`）
@@ -73,14 +74,9 @@ pnpm build:app
 
 电量只有一条壳层命令：`get_battery(device_id)`。`device_id` 与前端适配器的 `id` 来自同一份 `manifest.json`。托盘菜单也读 Rust 的 `PLUGINS`，不再单独维护设备表。
 
-### 再加一只鼠标
+给人看的步骤、HID 限制和验证方法写在 [docs/plugin-development.md](docs/plugin-development.md)。首页不用改，新鼠标只注册插件。
 
-1. 复制 `src/plugins/vt9-air/`，改 `manifest.json`（`id` / `name` / `description` 只写在这里）。
-2. 在 `src/plugins/index.ts` 的 `deviceRegistry` 追加一行。首页不用改。
-3. 在 `src-tauri/src/devices/` 增加模块（文件名用下划线，例如 `vt9_air.rs`）。只做中断 `read_timeout`，不要用 GetInputReport / Feature（会卡死鼠标）。`manifest_json` 用 `include_str!` 指向上面同一个 `manifest.json`。
-4. 在 `src-tauri/src/devices/mod.rs` 的 `PLUGINS` 追加一行。
-
-`list_devices` 返回这份 Rust 插件表，便于对照前端注册的 id。
+已注册：`vt9-air`（中断读 `0xBB`）、`razer-viper-ultimate`（Feature 报告，class `0x07` / cmd `0x80`，transaction `0xFF`，电量在 `arguments[1]`）。充电状态是同族命令 `0x84`。
 
 ## 后端结构
 

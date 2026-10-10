@@ -7,7 +7,7 @@ description: >-
 
 # 开发 mouse_tool
 
-改功能或加设备前先按下面的规则做。插件是**构建期的一只鼠标**，不是运行时插件市场。
+改功能或加设备前先按下面的规则做。插件是**构建期的一只鼠标**，不是运行时插件市场。给人看的步骤在 `docs/plugin-development.md`。
 
 ## 硬规则
 
@@ -19,13 +19,16 @@ description: >-
    - Rust：`src-tauri/src/devices/mod.rs` 的 `PLUGINS`，外加 `src-tauri/src/devices/` 下的模块。
    - 托盘菜单和电量都走 `PLUGINS`，不要在 `tray.rs` 再列设备。
 5. **电量命令。** 只用 `get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`。禁止再加无参、隐含只支持 VT9 的 `get_battery`。
-6. **HID 安全。** 设备插件只暴露该设备所需的最小读取。只允许中断 `read_timeout`。禁止 `GetInputReport`、Feature report、控制传输（会卡死鼠标）。壳层 capability 留在壳层，不要为了设备去放宽权限。
+6. **HID 按设备区分，不要一刀切。**
+   - 默认，以及雷柏 VT9 AIR：只允许中断 `read_timeout`。禁止 `GetInputReport`、Feature report、控制传输（会卡死雷柏鼠标）。
+   - 雷蛇，或模块顶部写明 opt-in Feature 的插件：可以用 hidapi 的 `send_feature_report` / `get_feature_report`（Feature `SET_REPORT` / `GET_REPORT`）。不要把这条放开到 VT9，也不要改用 `GetInputReport`。
+   - 壳层 capability 留在壳层，不要为了设备去放宽权限。
 
 ## 加一只鼠标
 
 1. 复制 `src/plugins/vt9-air/`，只改 `manifest.json`。
 2. 在 `src/plugins/index.ts` 的 `deviceRegistry` 加一行。
-3. 新增 Rust 模块，文件名用下划线（例如 `vt9_air.rs`），`manifest_json` 用 `include_str!` 指向上面的 `manifest.json`。只做中断 `read_timeout`。
+3. 新增 Rust 模块，文件名用下划线（例如 `vt9_air.rs`），`manifest_json` 用 `include_str!` 指向上面的 `manifest.json`。默认只做中断 `read_timeout`。只有模块顶部写明 opt-in 时才用 Feature report。VT9 永远不要用 Feature / `GetInputReport`。
 4. 在 `PLUGINS` 加一行。顺序与 `deviceRegistry` 保持一致。
 5. 不要为了注册设备去改 `HomePage`。页面继续用 `src/devices` 导出的 `deviceRegistry`。
 

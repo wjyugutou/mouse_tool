@@ -1,5 +1,6 @@
 /** 已安装的前端设备插件。新增鼠标时在 `deviceRegistry` 追加一行。 */
 import type { DeviceAdapter } from '@/plugin-sdk'
+import { razerViperUltimate } from './razer-viper-ultimate'
 import { vt9Air } from './vt9-air'
 
 export type { BatteryInfo, DeviceAdapter, DeviceMeta } from '@/plugin-sdk'
@@ -11,6 +12,7 @@ export type { BatteryInfo, DeviceAdapter, DeviceMeta } from '@/plugin-sdk'
  */
 export const deviceRegistry: DeviceAdapter[] = [
   vt9Air,
+  razerViperUltimate,
 ]
 
 export function getDeviceById(id: string): DeviceAdapter | undefined {
