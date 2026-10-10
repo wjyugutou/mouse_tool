@@ -1,5 +1,31 @@
-@reference "../../../index.css";
-
 .input {
-  @apply flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50
+  display: flex;
+  height: 2.25rem; /* h-9 */
+  width: 100%;
+  border-radius: calc(var(--radius) - 2px); /* rounded-md */
+  border: 1px solid var(--input); /* border + border-input */
+  background-color: transparent;
+  padding: 0.25rem 0.75rem; /* py-1 px-3 */
+  font-size: 0.875rem; /* text-sm */
+  line-height: 1.25rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-xs */
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.input:focus-visible {
+  outline: none;
+  box-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.05),
+    0 0 0 2px color-mix(in oklch, var(--ring) 40%, transparent); /* ring-2 ring-ring/40 */
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
