@@ -1,6 +1,6 @@
 {
   "productName": "鼠标工具",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "identifier": "com.wwwj.mousetool",
   "build": {
     "beforeDevCommand": "pnpm dev",
