@@ -24,7 +24,29 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$EXE/../logs"
+        },
+        {
+          "path": "$EXE/../logs/**"
+        },
+        {
+          "path": "$LOCALDATA/com.wwwj.mousetool/logs"
+        },
+        {
+          "path": "$LOCALDATA/com.wwwj.mousetool/logs/**"
+        },
+        {
+          "path": "$APPLOCALDATA/com.wwwj.mousetool/logs"
+        },
+        {
+          "path": "$APPLOCALDATA/com.wwwj.mousetool/logs/**"
+        }
+      ]
+    },
     "opener:allow-reveal-item-in-dir",
     "updater:default",
     "process:default"

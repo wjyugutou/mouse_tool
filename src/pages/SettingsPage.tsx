@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react'
 import { useNavigate } from '@tanstack/react-router'
 import { invoke } from '@tauri-apps/api/core'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { openPath, openUrl } from '@tauri-apps/plugin-opener'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
 import { useEffect, useMemo, useState } from 'react'
@@ -336,9 +336,9 @@ function AboutPanel() {
           onClick={() => {
             if (!logPath)
               return
-            // 打开日志所在目录
-            const dir = logPath.replace(/[\\/][^\\/]+$/, '')
-            void openPath(dir).catch(() => openPath(logPath))
+            void invoke('open_log_dir').catch((e) => {
+              console.error('open_log_dir failed', e)
+            })
           }}
         >
           打开日志目录

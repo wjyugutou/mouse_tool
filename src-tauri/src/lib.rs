@@ -20,6 +20,38 @@ fn get_log_path() -> String {
     app_log::log_file_path().to_string_lossy().into_owned()
 }
 
+/// Ensure log dir exists and open it in the system file manager.
+/// Frontend openPath fails silently when opener allow-open-path has no path scope.
+#[tauri::command]
+fn open_log_dir() -> Result<(), String> {
+    let dir = app_log::log_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("create log dir failed: {e}"))?;
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(dir.as_os_str())
+            .spawn()
+            .map_err(|e| format!("open explorer failed: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("open failed: {e}"))?;
+        return Ok(());
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("xdg-open failed: {e}"))?;
+        Ok(())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     app_log::init();
@@ -75,6 +107,7 @@ pub fn run() {
             get_battery,
             list_devices,
             get_log_path,
+            open_log_dir,
             set_tray_device
         ])
         .run(tauri::generate_context!());
