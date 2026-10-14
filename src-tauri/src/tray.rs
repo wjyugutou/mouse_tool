@@ -2,7 +2,8 @@
 
 use crate::app_log;
 use crate::devices;
-use crate::plugin_sdk::BatteryInfo;
+use crate::plugin_sdk::{BatteryInfo, DeviceCategory, DeviceMeta};
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::image::Image;
@@ -89,11 +90,65 @@ fn set_selected_tray_device(app: &AppHandle, id: &str) {
     );
 }
 
-/// 主窗口选中设备时调用：更新托盘目标并立刻刷新图标 / 提示。
+/// 每个分类至多一只。与前端 `SelectedByCategory` 同一份字段。
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SelectedByCategory {
+    #[serde(default)]
+    mouse: Option<String>,
+    #[serde(default)]
+    keyboard: Option<String>,
+    #[serde(default)]
+    headset: Option<String>,
+}
+
+impl SelectedByCategory {
+    fn get(&self, category: DeviceCategory) -> Option<&str> {
+        match category {
+            DeviceCategory::Mouse => self.mouse.as_deref(),
+            DeviceCategory::Keyboard => self.keyboard.as_deref(),
+            DeviceCategory::Headset => self.headset.as_deref(),
+        }
+    }
+
+    fn set(&mut self, category: DeviceCategory, id: String) {
+        let slot = match category {
+            DeviceCategory::Mouse => &mut self.mouse,
+            DeviceCategory::Keyboard => &mut self.keyboard,
+            DeviceCategory::Headset => &mut self.headset,
+        };
+        *slot = Some(id);
+    }
+}
+
+fn read_selected_by_category(app: &AppHandle) -> SelectedByCategory {
+    use tauri_plugin_zustand::ManagerExt;
+    app.zustand()
+        .get_or("settings", "selectedByCategory", SelectedByCategory::default())
+}
+
+fn save_selected_by_category(app: &AppHandle, selected: &SelectedByCategory) {
+    use tauri_plugin_zustand::ManagerExt;
+    if let Ok(value) = serde_json::to_value(selected) {
+        let _ = app
+            .zustand()
+            .set("settings", "selectedByCategory", value);
+    }
+}
+
+/// 主窗口选中设备时调用：记下该分类的选中项，并让托盘图标跟着这只。
 #[tauri::command]
-pub fn set_tray_device(app: AppHandle, device_id: String) {
+pub fn set_tray_device(
+    app: AppHandle,
+    device_id: String,
+    selected_by_category: SelectedByCategory,
+) {
     let id = resolve_stored_device_id(device_id);
+    let mut selected = sanitize_selection(&selected_by_category);
+    if let Some(plugin) = devices::find(&id) {
+        selected.set(plugin.meta().category, id.clone());
+    }
     set_selected_tray_device(&app, &id);
+    save_selected_by_category(&app, &selected);
     refresh_tray_battery(&app);
 }
 
@@ -296,23 +351,82 @@ fn make_battery_icon(percent: Option<u8>) -> Image<'static> {
     Image::new_owned(buf, S, S)
 }
 
-fn build_tray_menu(app: &AppHandle, selected_id: &str) -> tauri::Result<Menu<tauri::Wry>> {
+fn category_label(category: DeviceCategory) -> &'static str {
+    match category {
+        DeviceCategory::Mouse => "鼠标",
+        DeviceCategory::Keyboard => "键盘",
+        DeviceCategory::Headset => "耳机",
+    }
+}
+
+fn matching_meta(id: &str, category: DeviceCategory) -> Option<DeviceMeta> {
+    let meta = devices::find(id)?.meta();
+    (meta.category == category).then_some(meta)
+}
+
+fn sanitize_selection(selected: &SelectedByCategory) -> SelectedByCategory {
+    const ORDER: [DeviceCategory; 3] = [
+        DeviceCategory::Mouse,
+        DeviceCategory::Keyboard,
+        DeviceCategory::Headset,
+    ];
+    let mut clean = SelectedByCategory::default();
+    for category in ORDER {
+        if let Some(id) = selected.get(category) {
+            if let Some(meta) = matching_meta(id, category) {
+                clean.set(category, meta.id);
+            }
+        }
+    }
+    clean
+}
+
+struct TrayMenuEntry {
+    id: String,
+    name: String,
+    category: DeviceCategory,
+}
+
+/// 菜单只放每个分类里选中的那一只。该分类还没选时，用当前电量设备补上。
+fn tray_menu_entries(active_id: &str, selected: &SelectedByCategory) -> Vec<TrayMenuEntry> {
+    const ORDER: [DeviceCategory; 3] = [
+        DeviceCategory::Mouse,
+        DeviceCategory::Keyboard,
+        DeviceCategory::Headset,
+    ];
+    let mut entries = Vec::new();
+    for category in ORDER {
+        let chosen = selected
+            .get(category)
+            .and_then(|id| matching_meta(id, category));
+        let meta = chosen.or_else(|| matching_meta(active_id, category));
+        if let Some(meta) = meta {
+            entries.push(TrayMenuEntry {
+                id: meta.id,
+                name: meta.name,
+                category: meta.category,
+            });
+        }
+    }
+    entries
+}
+
+fn menu_label(active: bool, category: DeviceCategory, name: &str) -> String {
+    let mark = if active { "✓ " } else { "" };
+    format!("{mark}{} · {name}", category_label(category))
+}
+
+fn build_tray_menu(app: &AppHandle, active_id: &str) -> tauri::Result<Menu<tauri::Wry>> {
+    let selected = read_selected_by_category(app);
+    let entries = tray_menu_entries(active_id, &selected);
     let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
-    // CheckMenuItem 需要活过 build，放到 owned 列表
+    // MenuItem 需要活过 build，放到 owned 列表
     let mut checks = Vec::new();
-    for plugin in devices::plugins() {
-        let meta = plugin.meta();
-        let checked = meta.id == selected_id;
-        let label = if checked {
-            format!("✓ {}", meta.name)
-        } else {
-            meta.name
-        };
-        // 用普通 MenuItem + 勾选前缀，避免 CheckMenuItem 生命周期麻烦
+    for entry in &entries {
         let item = MenuItem::with_id(
             app,
-            format!("device:{}", meta.id),
-            label,
+            format!("device:{}", entry.id),
+            menu_label(entry.id == active_id, entry.category, &entry.name),
             true,
             None::<&str>,
         )?;
@@ -324,7 +438,9 @@ fn build_tray_menu(app: &AppHandle, selected_id: &str) -> tauri::Result<Menu<tau
     let sep = PredefinedMenuItem::separator(app)?;
     let show = MenuItem::with_id(app, "show", "打开主窗口", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    items.push(&sep);
+    if !checks.is_empty() {
+        items.push(&sep);
+    }
     items.push(&show);
     items.push(&quit);
     Menu::with_items(app, &items)
@@ -371,7 +487,7 @@ fn spawn_tray_updater(app: AppHandle) {
     });
 }
 
-/// 创建托盘：图标/提示显示电量；单击弹出设备列表；双击打开窗口。
+/// 创建托盘：图标/提示显示电量；单击弹出已选的鼠标、键盘、耳机；双击打开窗口。
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     app_log::info("setup_tray begin");
     let selected = read_stored_tray_device_id(app.handle());
@@ -385,7 +501,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     TrayIconBuilder::with_id("main")
         .icon(icon)
         .menu(&menu)
-        // 左键单击弹出菜单（设备列表）；双击另开窗口
+        // 左键单击弹出已选设备；双击另开窗口
         .show_menu_on_left_click(true)
         .tooltip("鼠标工具 · 读取电量中…")
         .on_menu_event(|app, event| {
@@ -416,4 +532,63 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     spawn_tray_updater(app.handle().clone());
     app_log::info("setup_tray ok");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ids(entries: &[TrayMenuEntry]) -> Vec<&str> {
+        entries.iter().map(|entry| entry.id.as_str()).collect()
+    }
+
+    #[test]
+    fn menu_shows_only_the_selected_mouse() {
+        let selected = SelectedByCategory {
+            mouse: Some("vt9-air".into()),
+            keyboard: None,
+            headset: None,
+        };
+        let entries = tray_menu_entries("vt9-air", &selected);
+        assert_eq!(ids(&entries), ["vt9-air"]);
+        assert_eq!(entries[0].category, DeviceCategory::Mouse);
+        assert_eq!(
+            menu_label(true, entries[0].category, &entries[0].name),
+            "✓ 鼠标 · VT9 AIR"
+        );
+    }
+
+    #[test]
+    fn switching_mouse_does_not_keep_the_other_mouse() {
+        let selected = SelectedByCategory {
+            mouse: Some("razer-viper-ultimate".into()),
+            keyboard: None,
+            headset: None,
+        };
+        let entries = tray_menu_entries("razer-viper-ultimate", &selected);
+        assert_eq!(ids(&entries), ["razer-viper-ultimate"]);
+    }
+
+    #[test]
+    fn empty_selection_falls_back_to_the_active_device_only() {
+        let entries = tray_menu_entries("razer-viper-ultimate", &SelectedByCategory::default());
+        assert_eq!(ids(&entries), ["razer-viper-ultimate"]);
+    }
+
+    #[test]
+    fn unknown_or_wrong_category_ids_are_dropped() {
+        let selected = SelectedByCategory {
+            mouse: Some("missing-mouse".into()),
+            keyboard: Some("vt9-air".into()),
+            headset: None,
+        };
+        let entries = tray_menu_entries("vt9-air", &selected);
+        assert_eq!(ids(&entries), ["vt9-air"]);
+        assert_eq!(entries[0].category, DeviceCategory::Mouse);
+
+        let clean = sanitize_selection(&selected);
+        assert_eq!(clean.mouse, None);
+        assert_eq!(clean.keyboard, None);
+        assert_eq!(clean.headset, None);
+    }
 }

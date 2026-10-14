@@ -8,11 +8,24 @@ export interface BatteryInfo {
   detail: string
 }
 
+/** 一级分类。顺序即首页分类栏顺序，与 Rust `DeviceCategory` 一致。 */
+export const DEVICE_CATEGORIES = ['mouse', 'keyboard', 'headset'] as const
+
+export type DeviceCategory = (typeof DEVICE_CATEGORIES)[number]
+
+export const DEVICE_CATEGORY_LABEL: Record<DeviceCategory, string> = {
+  mouse: '鼠标',
+  keyboard: '键盘',
+  headset: '耳机',
+}
+
 /** 与 `manifest.json` / Rust `DeviceMeta` 同一份字段。 */
 export interface DeviceMeta {
   id: string
   name: string
   description: string
+  /** `mouse` | `keyboard` | `headset` */
+  category: DeviceCategory
 }
 
 export interface DeviceAdapter {
@@ -22,6 +35,8 @@ export interface DeviceAdapter {
   name: string
   /** 列表里的短说明 */
   description: string
+  /** 一级分类，来自 manifest */
+  category: DeviceCategory
   /** 当前是否值得尝试读电量 */
   detect: () => Promise<boolean>
   /** 读电量。默认走壳层命令 `get_battery(deviceId)` */

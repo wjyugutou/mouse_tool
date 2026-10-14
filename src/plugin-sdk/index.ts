@@ -2,7 +2,8 @@
 import type { BatteryInfo, DeviceAdapter, DeviceMeta } from './types'
 import { invoke } from '@tauri-apps/api/core'
 
-export type { BatteryInfo, DeviceAdapter, DeviceMeta } from './types'
+export type { BatteryInfo, DeviceAdapter, DeviceCategory, DeviceMeta } from './types'
+export { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from './types'
 
 /**
  * 用 manifest 生成适配器。
@@ -14,6 +15,7 @@ export function createDeviceAdapter(meta: DeviceMeta): DeviceAdapter {
     id: meta.id,
     name: meta.name,
     description: meta.description,
+    category: meta.category,
     async detect() {
       try {
         const info = await invoke<BatteryInfo>('get_battery', { deviceId })

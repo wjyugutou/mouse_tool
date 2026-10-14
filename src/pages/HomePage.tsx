@@ -9,15 +9,17 @@ import {
   deviceRegistry,
   getDeviceById,
 } from '@/devices'
-import { useSettingsStore } from '@/stores/settings'
+import { resolveSelectedByCategory, useSettingsStore } from '@/stores/settings'
 
 export function HomePage() {
   const autoIntervalSec = useSettingsStore(s => s.autoIntervalSec)
+  const trayDeviceId = useSettingsStore(s => s.trayDeviceId)
+  const storedSelection = useSettingsStore(s => s.selectedByCategory)
   const setTrayDeviceId = useSettingsStore(s => s.setTrayDeviceId)
-  const [selectedId, setSelectedId] = useState(() => {
-    const stored = useSettingsStore.getState().trayDeviceId
-    return getDeviceById(stored)?.id ?? deviceRegistry[0]?.id ?? ''
-  })
+  const selectedByCategory = useMemo(
+    () => resolveSelectedByCategory(trayDeviceId, storedSelection),
+    [trayDeviceId, storedSelection],
+  )
   const [info, setInfo] = useState<BatteryInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,8 +29,8 @@ export function HomePage() {
   const ignoreTokenRef = useRef(0)
 
   const selected = useMemo(
-    () => getDeviceById(selectedId) ?? deviceRegistry[0],
-    [selectedId],
+    () => getDeviceById(trayDeviceId) ?? deviceRegistry[0],
+    [trayDeviceId],
   )
 
   const refresh = useCallback(async () => {
@@ -93,11 +95,15 @@ export function HomePage() {
     <div className="flex flex-1 flex-wrap items-center justify-center gap-5 overflow-auto p-6">
       <DeviceList
         devices={deviceRegistry}
-        selectedId={selected.id}
+        activeId={selected.id}
+        selectedByCategory={selectedByCategory}
         onSelect={(id) => {
-          setSelectedId(id)
           setTrayDeviceId(id)
-          void invoke('set_tray_device', { deviceId: id }).catch(() => {})
+          const next = useSettingsStore.getState().selectedByCategory
+          void invoke('set_tray_device', {
+            deviceId: id,
+            selectedByCategory: next,
+          }).catch(() => {})
           setInfo(null)
           setError(null)
           setAuto(true)

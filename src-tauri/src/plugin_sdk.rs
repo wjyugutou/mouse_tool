@@ -5,12 +5,22 @@
 
 use serde::{Deserialize, Serialize};
 
+/// 一级分类。与前端 `DeviceCategory` 同一套取值：`mouse` / `keyboard` / `headset`。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DeviceCategory {
+    Mouse,
+    Keyboard,
+    Headset,
+}
+
 /// 前端 `DeviceMeta` 与 `manifest.json` 的同一份字段。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DeviceMeta {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub category: DeviceCategory,
 }
 
 /// 电量结果。字段名与前端 `BatteryInfo` 一致。

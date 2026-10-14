@@ -3,7 +3,8 @@ import type { DeviceAdapter } from '@/plugin-sdk'
 import { razerViperUltimate } from './razer-viper-ultimate'
 import { vt9Air } from './vt9-air'
 
-export type { BatteryInfo, DeviceAdapter, DeviceMeta } from '@/plugin-sdk'
+export type { BatteryInfo, DeviceAdapter, DeviceCategory, DeviceMeta } from '@/plugin-sdk'
+export { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from '@/plugin-sdk'
 
 /**
  * 首页与设置的设备列表。

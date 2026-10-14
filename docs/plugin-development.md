@@ -8,7 +8,7 @@
 
 一只鼠标 = 一份前端适配器 + 一份 Rust HID 读取。两者在编译时写进程序。没有 DLL 热加载，也不扫描用户目录。
 
-窗口、设置、托盘壳、日志、更新留在壳层，不要做成插件。托盘只负责图标和菜单，设备名单从插件表来。
+窗口、设置、托盘壳、日志、更新留在壳层，不要做成插件。托盘只负责图标和菜单，设备名单从插件表来。菜单不铺开整张表，只显示每个分类里选中的那一只（鼠标、键盘、耳机各至多一项）。
 
 ## 目录
 
@@ -23,7 +23,7 @@
 | Rust 契约 | `src-tauri/src/plugin_sdk.rs` |
 | Rust 注册表 | `src-tauri/src/devices/mod.rs` 的 `PLUGINS` |
 
-`manifest.json` 只有三个字段：`id`、`name`、`description`。前端 `import` 这个文件，Rust 用 `include_str!` 读同一个文件。不要在托盘、设置默认值或别的表里再写一份 id / 名称。不要恢复 `TRAY_DEVICES`，也不要在设置里写死 `vt9-air`。默认托盘设备是两张注册表的第一项，所以两张表的顺序要一致。
+`manifest.json` 有四个字段：`id`、`name`、`description`、`category`。`category` 取 `mouse`、`keyboard`、`headset`，对应首页一级分类「鼠标 / 键盘 / 耳机」。前端 `import` 这个文件，Rust 用 `include_str!` 读同一个文件。不要在托盘、设置默认值或别的表里再写一份 id / 名称。不要恢复 `TRAY_DEVICES`，也不要在设置里写死 `vt9-air`。默认托盘设备是两张注册表的第一项，所以两张表的顺序要一致。
 
 电量只有一条壳层命令：`get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`，`createDeviceAdapter` 已经这么调。不要再加无参、隐含只支持 VT9 的 `get_battery`。`list_devices` 返回 Rust 侧已注册的设备，用来对照 id。
 

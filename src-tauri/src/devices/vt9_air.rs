@@ -205,5 +205,6 @@ mod tests {
         let meta = PLUGIN.meta();
         assert_eq!(meta.id, "vt9-air");
         assert_eq!(meta.name, "VT9 AIR");
+        assert_eq!(meta.category, crate::plugin_sdk::DeviceCategory::Mouse);
     }
 }
