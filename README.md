@@ -32,9 +32,15 @@ pnpm dev:app
 pnpm version:sync
 ```
 
-会自动同步到 `src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml`。`pnpm build` / `pnpm build:app` 也会先跑同步。
+会自动同步到 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 与 `src-tauri/Cargo.lock`。`pnpm build` / `pnpm build:app` 也会先跑同步。
 
-发版时也可直接：`pnpm release:tag 1.0.2`（改版本 → 同步 → 提交说明见脚本输出 → 打 tag）。
+发版（工作区需干净）：
+
+```powershell
+pnpm release:bump 2.0.3
+```
+
+脚本会写入上述版本文件，提交 `chore: 版本 bump 至 2.0.3`，打 tag `v2.0.3`，并推送当前分支和这个 tag。
 
 ## 本地打包
 
@@ -52,10 +58,9 @@ pnpm build:app
 
 ## 发版（自动更新）
 
-1. `pnpm version:sync` 前先改好 `package.json` 版本并提交，或用 release 脚本
-2. 推送同名 tag，例如 `v1.0.2`
-3. GitHub Actions `Release` 构建并上传 MSI、`latest.json`、`.sig`
-4. Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+1. `pnpm release:bump 2.0.3`：改版本、提交、打 tag `v2.0.3` 并推送
+2. GitHub Actions `Release` 在收到 `v*` tag 后构建并上传 MSI、`latest.json`、`.sig`
+3. Secrets：`TAURI_SIGNING_PRIVATE_KEY`、`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
 
 更新清单：
 

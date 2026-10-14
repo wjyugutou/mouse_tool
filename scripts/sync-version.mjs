@@ -17,4 +17,16 @@ const cargo = readFileSync(cargoPath, 'utf8').replace(
 )
 writeFileSync(cargoPath, cargo)
 
-console.log(`synced version ${version} → tauri.conf.json, Cargo.toml`)
+const lockPath = join(root, 'src-tauri', 'Cargo.lock')
+const lock = readFileSync(lockPath, 'utf8')
+const nextLock = lock.replace(
+  /(name = "tauri-app"\r?\nversion = ")[^"]+"/,
+  `$1${version}"`,
+)
+if (nextLock === lock) {
+  console.error('Cargo.lock 里没有找到 tauri-app 的 version')
+  process.exit(1)
+}
+writeFileSync(lockPath, nextLock)
+
+console.log(`synced version ${version} → tauri.conf.json, Cargo.toml, Cargo.lock`)
