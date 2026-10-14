@@ -1,8 +1,8 @@
 /** 应用设置（主题 / 刷新间隔 / 关窗行为 / 开机自启），经 @tauri-store/zustand 落盘 */
+import type { DeviceCategory } from '@/devices'
 import { createTauriStore } from '@tauri-store/zustand'
 import { create } from 'zustand'
 
-import type { DeviceCategory } from '@/devices'
 import { deviceRegistry, getDeviceById } from '@/devices'
 
 export type ThemeMode = 'light' | 'dark' | 'system'

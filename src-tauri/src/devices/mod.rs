@@ -11,10 +11,6 @@ use crate::plugin_sdk::{BatteryInfo, DeviceMeta, DevicePlugin};
 /// 构建期设备表。顺序即默认设备的顺序。托盘菜单只显示各分类里选中的那一只。
 static PLUGINS: &[&DevicePlugin] = &[&vt9_air::PLUGIN, &razer_viper_ultimate::PLUGIN];
 
-pub fn plugins() -> &'static [&'static DevicePlugin] {
-    PLUGINS
-}
-
 pub fn find(device_id: &str) -> Option<&'static DevicePlugin> {
     PLUGINS
         .iter()

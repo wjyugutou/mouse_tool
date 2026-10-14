@@ -1,7 +1,7 @@
 /** 已注册设备列表。左侧是一级分类，右侧是该分类下的设备。 */
 import type { DeviceAdapter, DeviceCategory } from '@/devices'
 import { Icon } from '@iconify/react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from '@/devices'
 import { cn } from '@/lib/utils'
@@ -27,12 +27,6 @@ export function DeviceList({ devices, activeId, selectedByCategory, onSelect }: 
   })
   const selectedId = selectedByCategory[category]
   const visible = devices.filter(device => device.category === category)
-
-  useEffect(() => {
-    const next = devices.find(device => device.id === activeId)?.category
-    if (next)
-      setCategory(next)
-  }, [activeId, devices])
 
   return (
     <Card className="w-[min(320px,92vw)] py-3">
