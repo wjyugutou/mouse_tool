@@ -19,11 +19,15 @@ writeFileSync(cargoPath, cargo)
 
 const lockPath = join(root, 'src-tauri', 'Cargo.lock')
 const lock = readFileSync(lockPath, 'utf8')
+let foundLockVersion = false
 const nextLock = lock.replace(
   /(name = "tauri-app"\r?\nversion = ")[^"]+"/,
-  `$1${version}"`,
+  (_, prefix) => {
+    foundLockVersion = true
+    return `${prefix}${version}"`
+  },
 )
-if (nextLock === lock) {
+if (!foundLockVersion) {
   console.error('Cargo.lock 里没有找到 tauri-app 的 version')
   process.exit(1)
 }
