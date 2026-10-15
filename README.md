@@ -54,7 +54,7 @@ pnpm release:bump 2.0.3
 pnpm build:app
 ```
 
-产物在 `src-tauri/target/release/bundle/msi/`（当前只打 MSI）。
+产物在 `src-tauri/target/release/bundle/msi/`（当前只打 MSI，文件名形如 `yu-mouse-tool_{version}_x64_zh-CN.msi`）。
 
 ## 发版（自动更新）
 
