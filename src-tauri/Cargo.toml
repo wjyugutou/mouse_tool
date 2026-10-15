@@ -1,5 +1,5 @@
 [package]
-name = "tauri-app"
+name = "yu-mouse-tool"
 version = "2.1.1"
 description = "A Tauri App"
 authors = [ "you" ]

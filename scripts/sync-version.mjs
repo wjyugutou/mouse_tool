@@ -21,14 +21,14 @@ const lockPath = join(root, 'src-tauri', 'Cargo.lock')
 const lock = readFileSync(lockPath, 'utf8')
 let foundLockVersion = false
 const nextLock = lock.replace(
-  /(name = "tauri-app"\r?\nversion = ")[^"]+"/,
+  /(name = "yu-mouse-tool"\r?\nversion = ")[^"]+"/,
   (_, prefix) => {
     foundLockVersion = true
     return `${prefix}${version}"`
   },
 )
 if (!foundLockVersion) {
-  console.error('Cargo.lock 里没有找到 tauri-app 的 version')
+  console.error('Cargo.lock 里没有找到 yu-mouse-tool 的 version')
   process.exit(1)
 }
 writeFileSync(lockPath, nextLock)

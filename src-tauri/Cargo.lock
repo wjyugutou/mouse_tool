@@ -3881,22 +3881,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-app"
-version = "2.1.1"
-dependencies = [
- "hidapi",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tauri-plugin-zustand",
-]
-
-[[package]]
 name = "tauri-build"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5373,6 +5357,22 @@ dependencies = [
  "quote",
  "syn 3.0.6",
  "synstructure",
+]
+
+[[package]]
+name = "yu-mouse-tool"
+version = "2.1.1"
+dependencies = [
+ "hidapi",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tauri-plugin-zustand",
 ]
 
 [[package]]

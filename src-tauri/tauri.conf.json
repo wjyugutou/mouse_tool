@@ -54,5 +54,6 @@
         "installMode": "passive"
       }
     }
-  }
+  },
+  "mainBinaryName": "yu-mouse-tool"
 }
