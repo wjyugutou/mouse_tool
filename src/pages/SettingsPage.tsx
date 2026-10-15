@@ -310,7 +310,7 @@ function AboutPanel() {
   return (
     <div className="space-y-3">
       <h2 className="text-lg font-semibold">关于</h2>
-      <p className="text-sm">鼠标工具 · 显示雷柏 VT9 AIR 电量</p>
+      <p className="text-sm">yugutou_tool · 显示雷柏 VT9 AIR 电量</p>
       <p className="text-muted-foreground text-sm">
         版本
         {' '}

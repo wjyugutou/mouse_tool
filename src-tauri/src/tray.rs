@@ -528,7 +528,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         // 左键单击弹出已选设备；双击另开窗口
         .show_menu_on_left_click(true)
-        .tooltip("鼠标工具 · 读取电量中…")
+        .tooltip("yugutou_tool · 读取电量中…")
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             if let Some(device_id) = id.strip_prefix("device:") {

@@ -1,4 +1,4 @@
-# 鼠标工具（mouse_tool）
+# yugutou_tool（mouse_tool）
 
 用 Tauri + React 做的 Windows 桌面小工具：读取雷柏 **VT9 AIR** 与雷蛇 **毒蝰终极版（Viper Ultimate）** 的电量。VT9 不依赖雷柏 GameDev 常驻运行。
 
@@ -54,7 +54,7 @@ pnpm release:bump 2.0.3
 pnpm build:app
 ```
 
-产物在 `src-tauri/target/release/bundle/msi/`（当前只打 MSI，文件名形如 `yu-mouse-tool_{version}_x64_zh-CN.msi`）。
+产物在 `src-tauri/target/release/bundle/msi/`（当前只打 MSI，文件名形如 `yugutou_tool_{version}_x64_zh-CN.msi`）。
 
 ## 发版（自动更新）
 

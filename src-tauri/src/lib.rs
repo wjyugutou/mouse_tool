@@ -1,4 +1,4 @@
-//! 鼠标工具 · 后端（Tauri）
+//! yugutou_tool · 后端（Tauri）
 //!
 //! - 设备电量由构建期插件提供（`devices::PLUGINS`），命令是 `get_battery(device_id)`
 //! - 只允许 HID 中断读；勿用 GetInputReport，会卡死鼠标

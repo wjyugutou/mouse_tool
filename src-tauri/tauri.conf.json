@@ -1,5 +1,5 @@
 {
-  "productName": "yu-mouse-tool",
+  "productName": "yugutou_tool",
   "version": "2.1.1",
   "identifier": "com.wwwj.mousetool",
   "build": {
@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "鼠标工具",
+        "title": "yugutou_tool",
         "width": 1200,
         "height": 644,
         "resizable": true,
@@ -55,5 +55,5 @@
       }
     }
   },
-  "mainBinaryName": "yu-mouse-tool"
+  "mainBinaryName": "yugutou_tool"
 }
