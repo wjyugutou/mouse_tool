@@ -151,8 +151,8 @@ export function renderEyes(now, config, shape, shapeRing, turnAngle, morphAmount
   if (config.pointer && this.pointer.active) {
     const bounds = this.svg.getBoundingClientRect();
     const flip = config.flipX ? -1 : 1;
-    this.pointer.targetX = 22 * clamp((this.pointer.clientX - (bounds.left + bounds.width / 2)) / bounds.width, -0.6, 0.6) * flip;
-    this.pointer.targetY = 14 * clamp((this.pointer.clientY - (bounds.top + bounds.height / 2)) / bounds.height, -0.6, 0.6);
+    this.pointer.targetX = 58 * clamp((this.pointer.clientX - (bounds.left + bounds.width / 2)) / bounds.width, -1, 1) * flip;
+    this.pointer.targetY = 40 * clamp((this.pointer.clientY - (bounds.top + bounds.height / 2)) / bounds.height, -1, 1);
   } else { this.pointer.targetX = 0; this.pointer.targetY = 0; }
   const smoothing = 1 - Math.exp(60 * Math.log(0.91) * (this.delta || 1 / 60));
 

@@ -94,4 +94,42 @@
     -moz-appearance: textfield;
     appearance: textfield;
   }
+
+  .scroll-wrap {
+    @apply overflow-auto;
+
+    /* 1. 滚动条整体宽度 */
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px; /* 横向滚动条高度 */
+    }
+
+    /* 2. 滚动条轨道（背景） */
+    &::-webkit-scrollbar-track {
+      background: transparent; /* 通常设置为透明或极浅的颜色 */
+      border-radius: 4px;
+    }
+    
+    &:hover::-webkit-scrollbar-track {
+      background: rgba(220, 223, 230, 0.3); /* 通常设置为透明或极浅的颜色 */
+    }
+
+    /* 3. 滚动条滑块（经常拉动的地方） */
+    &::-webkit-scrollbar-thumb {
+      background: transparent; /* 默认浅灰色，类似 Element 样式 */
+
+      border-radius: 4px;
+      transition: background-color 0.3s;
+    }
+    
+
+    /* 4. 鼠标悬停时的滑块颜色 */
+    &::-webkit-scrollbar-thumb {
+      background: rgba(220, 223, 230, 0); /* 通常设置为透明或极浅的颜色 */
+    }
+    /* 4. 鼠标悬停时的滑块颜色 */
+    &:hover::-webkit-scrollbar-thumb {
+      background: rgba(220, 223, 230, 0.8); /* 通常设置为透明或极浅的颜色 */
+    }
+  }
 }

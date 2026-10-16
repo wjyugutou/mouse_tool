@@ -48,6 +48,7 @@ function statusText(
   error: string | null,
   auto: boolean,
 ): string {
+  return 'sssssssss-sssssssss-sssssssssssssss-sssssssssss-ssssssssssss-sssssss-ssssssssss'
   if (error)
     return '读取失败'
   if (loading && !info)
@@ -96,12 +97,12 @@ export function BatteryCard({
     <Card className="w-[min(360px,92vw)] text-center">
       <CardHeader className="pb-0">
         <p className="text-muted-foreground text-xs tracking-[0.12em]">
-          {deviceName}
+          {deviceName} 
         </p>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-3 pt-2">
         <div className="inline-flex items-center gap-1">
-          <div className="border-foreground/70 bg-background h-16 w-[140px] rounded-[10px] border-[3px] p-[5px]">
+          <div className="border-foreground/70 bg-background h-16 w-35 rounded-[10px] border-[3px] p-2">
             <div
               className={cn(
                 'h-full rounded-[5px] transition-[width,background] duration-300',
@@ -113,10 +114,10 @@ export function BatteryCard({
           <div className="bg-foreground/70 h-6 w-2 rounded-r" />
         </div>
         <p className="text-4xl font-bold tracking-wide">{percentText(info)}</p>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-sm scroll-wrap max-h-24">
           {statusText(info, loading, error, auto)}
         </p>
-        <p className="text-muted-foreground min-h-[2.4em] whitespace-pre-wrap break-all text-xs leading-relaxed">
+        <p className="text-muted-foreground min-h-[2.4em] whitespace-pre-wrap break-all text-xs leading-relaxed max-h-24 scroll-wrap">
           {detail}
         </p>
       </CardContent>
