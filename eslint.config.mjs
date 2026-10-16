@@ -7,6 +7,8 @@ export default antfu(
       'src-tauri/**',
       'dist/**',
       'src/routeTree.gen.ts',
+      // Third-party Morph Bot runtime; keep it byte-for-byte with upstream.
+      'src/vendor/**',
     ],
   },
   {
