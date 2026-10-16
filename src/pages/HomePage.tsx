@@ -86,6 +86,7 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* 顶栏居中放 Morph Bot；shrink-0 避免被下方列表挤扁 */}
       <div className="flex shrink-0 items-center justify-center pt-3 pb-1">
         <MorphBot />
       </div>
