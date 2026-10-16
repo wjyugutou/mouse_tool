@@ -1,9 +1,10 @@
-/** 首页：设备列表 + 电量卡片，按设置间隔自动刷新。 */
+/** 首页：顶部 Morph Bot，下面是设备列表 + 电量卡片，按设置间隔自动刷新。 */
 import type { BatteryInfo } from '@/devices'
 import { invoke } from '@tauri-apps/api/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BatteryCard } from '@/components/BatteryCard'
 import { DeviceList } from '@/components/DeviceList'
+import { MorphBot } from '@/components/MorphBot'
 import {
 
   deviceRegistry,
@@ -83,41 +84,46 @@ export function HomePage() {
     void refresh()
   }, [refresh])
 
-  if (!selected) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-muted-foreground">尚未注册任何设备</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-1 flex-wrap items-center justify-center gap-5 overflow-auto p-6">
-      <DeviceList
-        devices={deviceRegistry}
-        activeId={selected.id}
-        selectedByCategory={selectedByCategory}
-        onSelect={(id) => {
-          setTrayDeviceId(id)
-          const next = useSettingsStore.getState().selectedByCategory
-          void invoke('set_tray_device', {
-            deviceId: id,
-            selectedByCategory: next,
-          }).catch(() => {})
-          setInfo(null)
-          setError(null)
-          setAuto(true)
-        }}
-      />
-      <BatteryCard
-        deviceName={selected.name}
-        info={info}
-        loading={loading}
-        auto={auto}
-        error={error}
-        onRefresh={startRefresh}
-        onStopRefresh={stopRefresh}
-      />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center justify-center pt-3 pb-1">
+        <MorphBot />
+      </div>
+      {selected
+        ? (
+            <div className="flex flex-1 flex-wrap items-center justify-center gap-5 overflow-auto px-6 pt-2 pb-6">
+              <DeviceList
+                devices={deviceRegistry}
+                activeId={selected.id}
+                selectedByCategory={selectedByCategory}
+                onSelect={(id) => {
+                  setTrayDeviceId(id)
+                  const next = useSettingsStore.getState().selectedByCategory
+                  void invoke('set_tray_device', {
+                    deviceId: id,
+                    selectedByCategory: next,
+                  }).catch(() => {})
+                  setInfo(null)
+                  setError(null)
+                  setAuto(true)
+                }}
+              />
+              <BatteryCard
+                deviceName={selected.name}
+                info={info}
+                loading={loading}
+                auto={auto}
+                error={error}
+                onRefresh={startRefresh}
+                onStopRefresh={stopRefresh}
+              />
+            </div>
+          )
+        : (
+            <div className="flex flex-1 items-center justify-center">
+              <p className="text-muted-foreground">尚未注册任何设备</p>
+            </div>
+          )}
     </div>
   )
 }
