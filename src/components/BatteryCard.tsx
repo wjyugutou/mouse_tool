@@ -48,7 +48,6 @@ function statusText(
   error: string | null,
   auto: boolean,
 ): string {
-  return 'sssssssss-sssssssss-sssssssssssssss-sssssssssss-ssssssssssss-sssssss-ssssssssss'
   if (error)
     return '读取失败'
   if (loading && !info)
@@ -97,7 +96,7 @@ export function BatteryCard({
     <Card className="w-[min(360px,92vw)] text-center">
       <CardHeader className="pb-0">
         <p className="text-muted-foreground text-xs tracking-[0.12em]">
-          {deviceName} 
+          {deviceName}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-3 pt-2">
