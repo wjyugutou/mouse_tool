@@ -33,7 +33,10 @@
 - `razer-viper-ultimate`：Feature 报告，模板是 `src/plugins/razer-viper-ultimate/` 与 `src-tauri/src/devices/razer_viper_ultimate.rs`
 - `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `src/plugins/mchose-a5-v3-ultra-plus/` 与 `src-tauri/src/devices/mchose_a5_v3_ultra.rs`
 - `vgn-s99`：**首只 `category: keyboard`**。接收器 `320F:5088` 的 `0xFF1C` 厂商接口走 Output 报文 + Input 中断读回（Report ID `0x04`，命令 `0x1A`），模板是 `src/plugins/vgn-s99/` 与 `src-tauri/src/devices/vgn_s99.rs`。它证明了一件事：**不是每只设备都能用 Feature 报告**。该接口描述符只有 `81 00`（Input）/ `91 00`（Output）、没有 `B1` 项，所以 `HidD_SetFeature` 恒返回 `0x1`
-- `qianxingzhe-s9-pro`：**前行者 S9 Pro**，VID `372E` 是 IPI/PIAO 的厂商号，走 `ms_pix_v1` 协议。接收器 `372E:103D` 的 `0xFF00` 厂商接口**有 `B1` 项**，所以能用 Feature 报告（Report ID `0x03`，payload 63 B）。命令 `get_basic_info`：`payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0...]`，`crc = sum(payload[1..]) % 256`；**电量 = 回包 `buf[6]`**。两个坑：①首次读回可能只有 5 字节状态桩 `03 50 02 00 02`，真回包要重读几次，读一次就放弃会和「设备不应答」完全一样；②充电时电量字段是哨兵值 `0xE4`(228)，官方配置器此时也只显示 228，谁都拿不到百分比。模板是 `src/plugins/qianxingzhe-s9-pro/` 与 `src-tauri/src/devices/qianxingzhe_s9_pro.rs`。它证明了一件事：**VID 不等于品牌**——同一个 VID 下 IPI 系几只鼠标共用一套协议，另外 `0x372E` 在某些表里被标成 `bytech` / PIAO
+- `qianxingzhe-s9-pro`：**前行者 S9 Pro**，VID `372E` 是 IPI/PIAO 的厂商号，走 `ms_pix_v1` 协议。接收器 `372E:103D` 的 `0xFF00` 厂商接口**有 `B1` 项**，所以能用 Feature 报告（Report ID `0x03`，payload 63 B）。命令 `get_basic_info`：`payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0...]`，`crc = sum(payload[1..]) % 256`；**电量 = 回包 `buf[6]`**。两个坑：①首次读回可能只有 5 字节状态桩 `03 50 02 00 02`，真回包要重读几次，读一次就放弃会和「设备不应答」完全一样；②充电时电量字段是哨兵值 `0xE4`(228)，官方配置器此时也只显示 228，谁都拿不到百分比。模板是 `src/plugins/qianxingzhe-s9-pro/` 与 `src-tauri/src/devices/qianxingzhe_s9_pro.rs`。它证明了两件事：
+  - **VID 不等于品牌**：同一个 VID 下 IPI 系几只鼠标共用一套协议，`0x372E` 在某些表里还被标成 `bytech` / PIAO
+  - **协议一样不等于该认领**：同厂的 IPI Float 88 / PIAO（PID `0x1014` / `0x1015` / `0x1028` / `0x1056`）也是 `ms_pix_v1`，但**不要**把它们加进本插件的 `PRODUCT_IDS`。否则插一只 IPI Float 88 会被「前行者 S9 Pro」认领，设备名全错，详情里的型号说明也是错的。插件名承诺支持谁，`PRODUCT_IDS` 就只收谁；同厂其它机型另开插件（如 `ipi-float-88`）。回归测试 `does_not_claim_other_ipi_models` 守着这条
+  - 型号与 PID 对照见官方 `D:\EWEADN S9\config.xml`：S9 Pro 有线 `0x1029`；Ultra `0x1027`；Max `0x105E`；三者共用 2.4G 接收器 PID `1026` / `1033` / `103D` / `1055`。**所以 2.4G 接收器上认不出具体型号**，只标「S9 系列」，Ultra/Max 有线 PID 明确拒绝冒充 Pro
 
 ## 加一只设备（鼠标 / 键盘 / 耳机）
 
