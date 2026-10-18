@@ -27,12 +27,13 @@
 
 电量只有一条壳层命令：`get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`，`createDeviceAdapter` 已经这么调。不要再加无参、隐含只支持 VT9 的 `get_battery`。`list_devices` 返回 Rust 侧已注册的设备，用来对照 id。
 
-现有四只：
+现有五只：
 
 - `vt9-air`：中断读，模板是 `src/plugins/vt9-air/` 与 `src-tauri/src/devices/vt9_air.rs`
 - `razer-viper-ultimate`：Feature 报告，模板是 `src/plugins/razer-viper-ultimate/` 与 `src-tauri/src/devices/razer_viper_ultimate.rs`
 - `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `src/plugins/mchose-a5-v3-ultra-plus/` 与 `src-tauri/src/devices/mchose_a5_v3_ultra.rs`
 - `vgn-s99`：**首只 `category: keyboard`**。接收器 `320F:5088` 的 `0xFF1C` 厂商接口走 Output 报文 + Input 中断读回（Report ID `0x04`，命令 `0x1A`），模板是 `src/plugins/vgn-s99/` 与 `src-tauri/src/devices/vgn_s99.rs`。它证明了一件事：**不是每只设备都能用 Feature 报告**。该接口描述符只有 `81 00`（Input）/ `91 00`（Output）、没有 `B1` 项，所以 `HidD_SetFeature` 恒返回 `0x1`
+- `qianxingzhe-s9-pro`：**前行者 S9 Pro**，VID `372E` 是 IPI/PIAO 的厂商号，走 `ms_pix_v1` 协议。接收器 `372E:103D` 的 `0xFF00` 厂商接口**有 `B1` 项**，所以能用 Feature 报告（Report ID `0x03`，payload 63 B）。命令 `get_basic_info`：`payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0...]`，`crc = sum(payload[1..]) % 256`；**电量 = 回包 `buf[6]`**。两个坑：①首次读回可能只有 5 字节状态桩 `03 50 02 00 02`，真回包要重读几次，读一次就放弃会和「设备不应答」完全一样；②充电时电量字段是哨兵值 `0xE4`(228)，官方配置器此时也只显示 228，谁都拿不到百分比。模板是 `src/plugins/qianxingzhe-s9-pro/` 与 `src-tauri/src/devices/qianxingzhe_s9_pro.rs`。它证明了一件事：**VID 不等于品牌**——同一个 VID 下 IPI 系几只鼠标共用一套协议，另外 `0x372E` 在某些表里被标成 `bytech` / PIAO
 
 ## 加一只设备（鼠标 / 键盘 / 耳机）
 
@@ -92,3 +93,12 @@ cargo test --lib
 - 迈从 A5 V3 Ultra+：接收器 `3837:1018` 插在 MagDock 上也可以；选中后应出现百分比，说明里会写 `接收器邮箱 0x4D/0x0900`。M HUB 开着时如果读不到，先关掉再试。
 - 两只都接上时，来回切换，确认 VT9 仍是中断读、毒蝰仍是 Feature 读。
 - VGN S99：先**完全退出 VGN VHUB**（它会独占 `0xFF1C` 接口），选中「VGN S99」后应出现百分比，说明里会写 `厂商邮箱 Output 0x04/0x1A`。充电时插线应显示「充电中」。读不到时先确认键盘已开机并与接收器配对。
+- 前行者 S9 Pro：插上 `372E:103D` 接收器，选中「前行者 S9 Pro」后应出现百分比，说明里会写 `Feature 0x03/0x4F · n%`。充电时插线只能显示「正在充电，此状态拿不到百分比」（厂商哨兵值 `0xE4`，官方软件同样拿不到）。**不能只跑探针验收**，要跑插件自己的读取路径：
+
+  ```bash
+  cd src-tauri
+  cargo test --lib s9_pro_reads_real_hardware -- --ignored --nocapture
+  ```
+
+  这条是 `#[ignore]` 的实机测试，默认不跑（依赖硬件）。它会打印 `connected / percent / charging / detail`，并断言「有百分比时 ≤ 100；没百分比时必须是充电中」，防止把读取失败悄悄报成正常。
+- 探针复现协议用 `tools/hid-probe`：`hid-probe s9pro` 会发同一条 `0x4F/0x81` 查询并把每次读回的原始字节打出来。改协议时先用它看真实报文，再改进插件。
