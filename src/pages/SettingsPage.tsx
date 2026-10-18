@@ -252,22 +252,28 @@ function AppearancePanel({
             勾选后关闭窗口会进托盘；不勾选则直接退出。托盘可打开或退出。
           </p>
 
-          <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
-            <span className="text-muted-foreground text-xs">开机自启</span>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <Checkbox
-                checked={launchAtLogin}
-                onCheckedChange={(checked) => {
-                  onLaunchAtLoginChange(checked === true)
-                }}
-                aria-label="开机自启"
-              />
-              <span>开机时后台启动（不打开窗口）</span>
-            </label>
-            <p className="text-muted-foreground text-xs">
-              勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
-            </p>
-          </div>
+          {
+            import.meta.env.DEV
+              ? null
+              : (
+                  <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+                    <span className="text-muted-foreground text-xs">开机自启</span>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={launchAtLogin}
+                        onCheckedChange={(checked) => {
+                          onLaunchAtLoginChange(checked === true)
+                        }}
+                        aria-label="开机自启"
+                      />
+                      <span>开机时后台启动（不打开窗口）</span>
+                    </label>
+                    <p className="text-muted-foreground text-xs">
+                      勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
+                    </p>
+                  </div>
+                )
+          }
         </div>
       </div>
     </div>
