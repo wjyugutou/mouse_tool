@@ -40,7 +40,7 @@ function pickOther<T extends string>(items: readonly T[], current: string): T {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     window.setTimeout(resolve, ms)
   })
 }
@@ -105,8 +105,11 @@ export function MorphBot({ size = 160 }: Props) {
     }
 
     const waitWhileHoverPaused = async () => {
-      while (hoverPaused && !cancelled)
+      while (true) {
+        if (!hoverPaused || cancelled)
+          break
         await sleep(80)
+      }
     }
 
     const onWindowPointerLeave = () => setHoverPaused(false)
@@ -118,7 +121,9 @@ export function MorphBot({ size = 160 }: Props) {
 
     const run = async () => {
       let state: MorphBotState = pickOther(MORPH_BOT_STATES, '')
-      while (!cancelled) {
+      while (true) {
+        if (cancelled)
+          break
         await waitWhileHoverPaused()
         if (cancelled)
           return

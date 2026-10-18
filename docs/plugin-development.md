@@ -27,10 +27,11 @@
 
 电量只有一条壳层命令：`get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`，`createDeviceAdapter` 已经这么调。不要再加无参、隐含只支持 VT9 的 `get_battery`。`list_devices` 返回 Rust 侧已注册的设备，用来对照 id。
 
-现有两只：
+现有三只：
 
 - `vt9-air`：中断读，模板是 `src/plugins/vt9-air/` 与 `src-tauri/src/devices/vt9_air.rs`
 - `razer-viper-ultimate`：Feature 报告，模板是 `src/plugins/razer-viper-ultimate/` 与 `src-tauri/src/devices/razer_viper_ultimate.rs`
+- `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `src/plugins/mchose-a5-v3-ultra-plus/` 与 `src-tauri/src/devices/mchose_a5_v3_ultra.rs`
 
 ## 加一只鼠标
 
@@ -48,6 +49,8 @@
 雷蛇毒蝰终极版没有这种被动推送。OpenRazer 的电量查询是 Feature `SET_REPORT` 再 `GET_REPORT`：90 字节报告，Report ID `0x00`，transaction `0xFF`，class `0x07`，电量命令 `0x80`，原始值在 `arguments[1]`（0–255，再换成百分比）。充电状态是同族命令 `0x84`。本仓库用 hidapi 的 `send_feature_report` / `get_feature_report` 做这件事，对应有线 `1532:007A` 和接收器 `1532:007B`。这只允许写在模块顶部已经声明 opt-in Feature 的插件里。`GetInputReport`（`get_input_report`）对谁都不许用，包括雷蛇。
 
 新鼠标如果文档只有 Feature / 控制传输，而你还不能证明它对这只设备安全，就不要照搬雷蛇的发送代码。先把设备和「为什么不能读」写清楚，确认协议后再 opt-in。
+
+迈从 A5 V3 Ultra+(3955) 是第三种情况：它的 `0xFF01` 集合上 `get_feature_report(0x11)` 在 Windows 恒失败（`0x1F`），但 `0x4D` 的 64 字节输出报文有回包。M HUB 对 3955 平台用的是 `[0x4D, 0x01, flags, len, cmd_lo, cmd_hi, biz, seq, data..., checksum]` 邮箱，`0x0900` 返回设备信息，电量在 data[12]、充电在 data[11]。首包可能是 `FF` 占位，要重发。模块顶部已写明这是 opt-in 的厂商报文；旧固件的 `0x11/0x06` Feature 只作为回退，不要把它当成 3955 的主通道，也不要用 `get_input_report`。
 
 ## 怎么验证
 
@@ -70,4 +73,5 @@ cargo test --lib
 
 - VT9 AIR：插上雷柏接收器，选中后应出现百分比。读的过程里不要改用 Feature。
 - 毒蝰终极版：先关掉 Razer Synapse（它可能独占 HID），插上接收器或用线连接，选「毒蝰终极版 Viper Ultimate」。应出现百分比；说明里会有 `raw n/255`。拔掉后再刷新，应提示未找到设备。
+- 迈从 A5 V3 Ultra+：接收器 `3837:1018` 插在 MagDock 上也可以；选中后应出现百分比，说明里会写 `接收器邮箱 0x4D/0x0900`。M HUB 开着时如果读不到，先关掉再试。
 - 两只都接上时，来回切换，确认 VT9 仍是中断读、毒蝰仍是 Feature 读。

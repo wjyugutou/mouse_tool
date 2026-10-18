@@ -1,12 +1,10 @@
-/** 首页：顶部 Morph Bot，下面是设备列表 + 电量卡片，按设置间隔自动刷新。 */
+/** 首页：左侧设备侧栏，右侧电量 hero 卡，按设置间隔自动刷新。 */
 import type { BatteryInfo } from '@/devices'
 import { invoke } from '@tauri-apps/api/core'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BatteryCard } from '@/components/BatteryCard'
 import { DeviceList } from '@/components/DeviceList'
-import { MorphBot } from '@/components/MorphBot'
 import {
-
   deviceRegistry,
   getDeviceById,
 } from '@/devices'
@@ -25,6 +23,7 @@ export function HomePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [auto, setAuto] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   // 防止并发刷新；token 用于丢弃过期响应
   const inflightRef = useRef(false)
   const ignoreTokenRef = useRef(0)
@@ -46,12 +45,14 @@ export function HomePage() {
       if (token !== ignoreTokenRef.current)
         return
       setInfo(next)
+      setLastUpdated(new Date())
     }
     catch (e) {
       if (token !== ignoreTokenRef.current)
         return
       setInfo(null)
       setError(String(e))
+      setLastUpdated(new Date())
     }
     finally {
       if (token === ignoreTokenRef.current) {
@@ -85,46 +86,52 @@ export function HomePage() {
   }, [refresh])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* 顶栏居中放 Morph Bot；shrink-0 避免被下方列表挤扁 */}
-      <div className="flex shrink-0 items-center justify-center pt-3 pb-1">
-        <MorphBot />
-      </div>
-      {selected
-        ? (
-            <div className="flex flex-1 flex-wrap items-center justify-center gap-5 overflow-auto px-6 pt-2 pb-6">
-              <DeviceList
-                devices={deviceRegistry}
-                activeId={selected.id}
-                selectedByCategory={selectedByCategory}
-                onSelect={(id) => {
-                  setTrayDeviceId(id)
-                  const next = useSettingsStore.getState().selectedByCategory
-                  void invoke('set_tray_device', {
-                    deviceId: id,
-                    selectedByCategory: next,
-                  }).catch(() => {})
-                  setInfo(null)
-                  setError(null)
-                  setAuto(true)
-                }}
-              />
-              <BatteryCard
-                deviceName={selected.name}
-                info={info}
-                loading={loading}
-                auto={auto}
-                error={error}
-                onRefresh={startRefresh}
-                onStopRefresh={stopRefresh}
-              />
-            </div>
-          )
-        : (
-            <div className="flex flex-1 items-center justify-center">
-              <p className="text-muted-foreground">尚未注册任何设备</p>
-            </div>
-          )}
+    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <DeviceList
+        devices={deviceRegistry}
+        activeId={selected.id}
+        selectedByCategory={selectedByCategory}
+        onSelect={(id) => {
+          setTrayDeviceId(id)
+          const next = useSettingsStore.getState().selectedByCategory
+          void invoke('set_tray_device', {
+            deviceId: id,
+            selectedByCategory: next,
+          }).catch(() => {})
+          setInfo(null)
+          setError(null)
+          setLastUpdated(null)
+          setAuto(true)
+        }}
+        auto={auto}
+        autoIntervalSec={autoIntervalSec}
+      />
+
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="bg-primary/10 pointer-events-none absolute -top-40 right-[-12%] size-[520px] rounded-full blur-[120px]" />
+        <div className="relative mx-auto flex min-h-full w-full max-w-[860px] flex-col justify-start px-5 py-6 lg:justify-center lg:px-10 lg:py-8">
+          {selected
+            ? (
+                <BatteryCard
+                  deviceName={selected.name}
+                  info={info}
+                  loading={loading}
+                  auto={auto}
+                  autoIntervalSec={autoIntervalSec}
+                  error={error}
+                  lastUpdated={lastUpdated}
+                  onRefresh={refresh}
+                  onStartRefresh={startRefresh}
+                  onStopRefresh={stopRefresh}
+                />
+              )
+            : (
+                <div className="flex flex-1 items-center justify-center">
+                  <p className="text-muted-foreground">尚未注册任何设备</p>
+                </div>
+              )}
+        </div>
+      </main>
     </div>
   )
 }

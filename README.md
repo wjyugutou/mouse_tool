@@ -4,6 +4,8 @@
 
 仓库：https://github.com/wjyugutou/mouse_tool
 
+![UI](./docs/ui_home_final.png)
+
 ## 功能
 
 - VT9 AIR：被动中断读 HID 电量（Report `0xBB`）。不要对它用 GetInputReport / Feature，会卡鼠标
@@ -66,7 +68,7 @@ pnpm build:app
 
 `https://github.com/wjyugutou/mouse_tool/releases/latest/download/latest.json`
 
-**Latest Release 必须带 `latest.json`**；空的 Latest 或长期 Draft 会导致应用内检查失败。
+**Latest Release 必须带** `latest.json`；空的 Latest 或长期 Draft 会导致应用内检查失败。
 
 ## 设备插件
 
