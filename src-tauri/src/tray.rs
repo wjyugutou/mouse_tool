@@ -6,6 +6,7 @@ use crate::devices;
 use crate::plugin_sdk::{BatteryInfo, DeviceCategory, DeviceMeta};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
@@ -34,10 +35,6 @@ pub(crate) fn auto_refresh_enabled(app: &AppHandle) -> bool {
 }
 
 /// 托盘菜单与电量都走设备插件表，不在这里维护第二份 id / 名称。
-fn device_name(id: &str) -> String {
-    devices::device_name(id)
-}
-
 fn resolve_stored_device_id(stored: String) -> String {
     if devices::find(&stored).is_some() {
         stored
@@ -389,54 +386,100 @@ fn category_key(category: DeviceCategory) -> &'static str {
 }
 
 struct TrayMenuEntry {
-    /// 该分类当前选中的设备。没有则为空行。
+    /// 这一行对应的设备。该分类没有插件时为空行。
     id: Option<String>,
     name: Option<String>,
     category: DeviceCategory,
 }
 
-/// 鼠标、键盘、耳机各一行。有选中设备就写名称；没有就写「未选择」。
-/// 某分类还没记下选中项时，只用当前电量设备补这一类，不会把同分类的其他设备也放进来。
-fn tray_menu_entries(active_id: &str, selected: &SelectedByCategory) -> Vec<TrayMenuEntry> {
+/// 每个分类列出插件表里的每一只。该分类一台都没有时留一行「未选择」。
+fn tray_menu_entries() -> Vec<TrayMenuEntry> {
     const ORDER: [DeviceCategory; 3] = [
         DeviceCategory::Mouse,
         DeviceCategory::Keyboard,
         DeviceCategory::Headset,
     ];
-    let selected = resolve_selection(active_id, selected);
-    ORDER
-        .into_iter()
-        .map(|category| {
-            let meta = selected
-                .get(category)
-                .and_then(|id| matching_meta(id, category));
-            match meta {
-                Some(meta) => TrayMenuEntry {
-                    id: Some(meta.id),
-                    name: Some(meta.name),
-                    category: meta.category,
-                },
-                None => TrayMenuEntry {
-                    id: None,
-                    name: None,
-                    category,
-                },
-            }
-        })
-        .collect()
+    let metas = devices::list_meta();
+    let mut entries = Vec::new();
+    for category in ORDER {
+        let mut found = false;
+        for meta in metas.iter().filter(|meta| meta.category == category) {
+            found = true;
+            entries.push(TrayMenuEntry {
+                id: Some(meta.id.clone()),
+                name: Some(meta.name.clone()),
+                category,
+            });
+        }
+        if !found {
+            entries.push(TrayMenuEntry {
+                id: None,
+                name: None,
+                category,
+            });
+        }
+    }
+    entries
 }
 
-fn menu_label(active: bool, category: DeviceCategory, name: Option<&str>) -> String {
+fn battery_status(info: Option<&BatteryInfo>) -> String {
+    match info {
+        Some(info) => match info.percent {
+            Some(percent) => format!("{percent}%"),
+            None if info.connected => "电量未知".into(),
+            None => "未连接".into(),
+        },
+        None => "读取中…".into(),
+    }
+}
+
+/// 悬停提示列出每一只。打勾的是图标数字跟着的那一只。
+pub(crate) fn tooltip_text(active_id: &str, samples: &HashMap<String, BatteryInfo>) -> String {
+    let lines: Vec<String> = devices::list_meta()
+        .into_iter()
+        .map(|meta| {
+            let status = battery_status(samples.get(&meta.id));
+            if meta.id == active_id {
+                format!("✓ {} · {status}", meta.name)
+            } else {
+                format!("{} · {status}", meta.name)
+            }
+        })
+        .collect();
+    if lines.is_empty() {
+        "yugutou_tool".into()
+    } else {
+        lines.join("\n")
+    }
+}
+
+fn menu_label(
+    active: bool,
+    category: DeviceCategory,
+    name: Option<&str>,
+    status: Option<&str>,
+) -> String {
     match name {
-        Some(name) if active => format!("✓ {} · {name}", category_label(category)),
-        Some(name) => format!("{} · {name}", category_label(category)),
+        Some(name) if active => format!(
+            "✓ {} · {name} · {}",
+            category_label(category),
+            status.unwrap_or("读取中…")
+        ),
+        Some(name) => format!(
+            "{} · {name} · {}",
+            category_label(category),
+            status.unwrap_or("读取中…")
+        ),
         None => format!("{} · 未选择", category_label(category)),
     }
 }
 
-fn build_tray_menu(app: &AppHandle, active_id: &str) -> tauri::Result<Menu<tauri::Wry>> {
-    let selected = read_selected_by_category(app);
-    let entries = tray_menu_entries(active_id, &selected);
+fn build_tray_menu(
+    app: &AppHandle,
+    active_id: &str,
+    samples: &HashMap<String, BatteryInfo>,
+) -> tauri::Result<Menu<tauri::Wry>> {
+    let entries = tray_menu_entries();
     let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
     // MenuItem 需要活过 build，放到 owned 列表
     let mut checks = Vec::new();
@@ -445,6 +488,10 @@ fn build_tray_menu(app: &AppHandle, active_id: &str) -> tauri::Result<Menu<tauri
             Some(id) => format!("device:{id}"),
             None => format!("empty:{}", category_key(entry.category)),
         };
+        let status = entry
+            .id
+            .as_deref()
+            .map(|id| battery_status(samples.get(id)));
         let item = MenuItem::with_id(
             app,
             item_id,
@@ -452,6 +499,7 @@ fn build_tray_menu(app: &AppHandle, active_id: &str) -> tauri::Result<Menu<tauri
                 entry.id.as_deref() == Some(active_id),
                 entry.category,
                 entry.name.as_deref(),
+                status.as_deref(),
             ),
             entry.id.is_some(),
             None::<&str>,
@@ -472,19 +520,35 @@ fn build_tray_menu(app: &AppHandle, active_id: &str) -> tauri::Result<Menu<tauri
     Menu::with_items(app, &items)
 }
 
-fn apply_tray_status(app: &AppHandle, info: &BatteryInfo, selected_id: &str) {
-    let name = device_name(selected_id);
-    let tip = match info.percent {
-        Some(p) => format!("{name} · {p}%"),
-        None if info.connected => format!("{name} · 电量未知"),
-        None => format!("{name} · 未连接"),
+/// 每只设备最近一次电量。图标只画当前选中的那一只，提示和菜单用全部。
+struct TrayBoard {
+    samples: Mutex<HashMap<String, BatteryInfo>>,
+}
+
+fn sample_snapshot(app: &AppHandle) -> HashMap<String, BatteryInfo> {
+    app.try_state::<TrayBoard>()
+        .map(|board| {
+            board
+                .samples
+                .lock()
+                .unwrap_or_else(|err| err.into_inner())
+                .clone()
+        })
+        .unwrap_or_default()
+}
+
+fn redraw_tray(app: &AppHandle) {
+    let samples = sample_snapshot(app);
+    let active = read_stored_tray_device_id(app);
+    let tip = tooltip_text(&active, &samples);
+    let Some(tray) = app.tray_by_id("main") else {
+        return;
     };
-    if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(&tip));
-        let _ = tray.set_icon(Some(make_battery_icon(info.percent)));
-        if let Ok(menu) = build_tray_menu(app, selected_id) {
-            let _ = tray.set_menu(Some(menu));
-        }
+    let _ = tray.set_tooltip(Some(&tip));
+    let percent = samples.get(&active).and_then(|info| info.percent);
+    let _ = tray.set_icon(Some(make_battery_icon(percent)));
+    if let Ok(menu) = build_tray_menu(app, &active, &samples) {
+        let _ = tray.set_menu(Some(menu));
     }
 }
 
@@ -495,16 +559,18 @@ pub(crate) fn publish_battery(app: &AppHandle, device_id: &str, info: &BatteryIn
             info.detail
         ));
     }
-    apply_tray_status(app, info, device_id);
+    if let Some(board) = app.try_state::<TrayBoard>() {
+        board
+            .samples
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .insert(device_id.to_string(), info.clone());
+    }
+    redraw_tray(app);
 }
 
 pub(crate) fn refresh_tray_menu(app: &AppHandle) {
-    let id = read_stored_tray_device_id(app);
-    if let Some(tray) = app.tray_by_id("main") {
-        if let Ok(menu) = build_tray_menu(app, &id) {
-            let _ = tray.set_menu(Some(menu));
-        }
-    }
+    redraw_tray(app);
 }
 
 #[derive(Clone)]
@@ -609,24 +675,29 @@ pub(crate) fn install_settings_watch(app: &AppHandle) {
     }
 }
 
-/// 创建托盘：图标/提示显示电量；单击弹出已选的鼠标、键盘、耳机；双击打开窗口。
+/// 创建托盘：图标显示当前设备电量，提示和菜单列出每一只；双击打开窗口。
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     app_log::info("setup_tray begin");
     let selected = read_stored_tray_device_id(app.handle());
     app.manage(battery::BatteryHub::new());
+    app.manage(TrayBoard {
+        samples: Mutex::new(HashMap::new()),
+    });
     app.manage(SettingsWatch {
         snap: Mutex::new(SettingsSnap::default()),
     });
 
-    let menu = build_tray_menu(app.handle(), &selected)?;
+    let samples = HashMap::new();
+    let menu = build_tray_menu(app.handle(), &selected, &samples)?;
     let icon = make_battery_icon(None);
+    let tip = tooltip_text(&selected, &samples);
 
     TrayIconBuilder::with_id("main")
         .icon(icon)
         .menu(&menu)
-        // 左键单击弹出已选设备；双击另开窗口
+        // 左键单击弹出全部设备；双击另开窗口
         .show_menu_on_left_click(true)
-        .tooltip("yugutou_tool · 读取电量中…")
+        .tooltip(tip)
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             if let Some(device_id) = id.strip_prefix("device:") {
@@ -666,46 +737,61 @@ mod tests {
     }
 
     #[test]
-    fn menu_shows_one_row_per_category() {
-        let selected = SelectedByCategory {
-            mouse: Some("vt9-air".into()),
-            keyboard: None,
-            headset: None,
-        };
-        let entries = tray_menu_entries("vt9-air", &selected);
-        assert_eq!(ids(&entries), [Some("vt9-air"), None, None]);
-        assert_eq!(entries[0].category, DeviceCategory::Mouse);
-        assert_eq!(entries[1].category, DeviceCategory::Keyboard);
-        assert_eq!(entries[2].category, DeviceCategory::Headset);
+    fn menu_lists_every_device_and_keeps_empty_categories() {
+        let entries = tray_menu_entries();
         assert_eq!(
-            menu_label(true, entries[0].category, entries[0].name.as_deref()),
-            "✓ 鼠标 · VT9 AIR"
+            ids(&entries),
+            [
+                Some("vt9-air"),
+                Some("razer-viper-ultimate"),
+                Some("mchose-a5-v3-ultra-plus"),
+                None,
+                None,
+            ]
+        );
+        assert_eq!(entries[0].category, DeviceCategory::Mouse);
+        assert_eq!(entries[3].category, DeviceCategory::Keyboard);
+        assert_eq!(entries[4].category, DeviceCategory::Headset);
+        assert_eq!(
+            menu_label(
+                true,
+                entries[0].category,
+                entries[0].name.as_deref(),
+                Some("88%")
+            ),
+            "✓ 鼠标 · VT9 AIR · 88%"
         );
         assert_eq!(
-            menu_label(false, entries[1].category, None),
+            menu_label(false, entries[3].category, None, None),
             "键盘 · 未选择"
         );
         assert_eq!(
-            menu_label(false, entries[2].category, None),
+            menu_label(false, entries[4].category, None, None),
             "耳机 · 未选择"
         );
     }
 
     #[test]
-    fn switching_mouse_does_not_keep_the_other_mouse() {
-        let selected = SelectedByCategory {
-            mouse: Some("razer-viper-ultimate".into()),
-            keyboard: None,
-            headset: None,
-        };
-        let entries = tray_menu_entries("razer-viper-ultimate", &selected);
-        assert_eq!(ids(&entries), [Some("razer-viper-ultimate"), None, None]);
-    }
-
-    #[test]
-    fn empty_selection_falls_back_to_the_active_device_only() {
-        let entries = tray_menu_entries("razer-viper-ultimate", &SelectedByCategory::default());
-        assert_eq!(ids(&entries), [Some("razer-viper-ultimate"), None, None]);
+    fn tooltip_lists_every_device_and_marks_the_icon_device() {
+        let mut samples = HashMap::new();
+        samples.insert(
+            "mchose-a5-v3-ultra-plus".into(),
+            BatteryInfo {
+                percent: Some(88),
+                charging: None,
+                connected: true,
+                device: "迈从 A5 V3 Ultra+".into(),
+                detail: String::new(),
+            },
+        );
+        samples.insert(
+            "razer-viper-ultimate".into(),
+            BatteryInfo::disconnected("毒蝰终极版 Viper Ultimate", "未连接"),
+        );
+        assert_eq!(
+            tooltip_text("mchose-a5-v3-ultra-plus", &samples),
+            "VT9 AIR · 读取中…\n毒蝰终极版 Viper Ultimate · 未连接\n✓ 迈从 A5 V3 Ultra+ · 88%"
+        );
     }
 
     #[test]
@@ -715,10 +801,6 @@ mod tests {
             keyboard: Some("vt9-air".into()),
             headset: None,
         };
-        let entries = tray_menu_entries("vt9-air", &selected);
-        assert_eq!(ids(&entries), [Some("vt9-air"), None, None]);
-        assert_eq!(entries[0].category, DeviceCategory::Mouse);
-
         let clean = sanitize_selection(&selected);
         assert_eq!(clean.mouse, None);
         assert_eq!(clean.keyboard, None);
@@ -732,7 +814,7 @@ mod tests {
             keyboard: None,
             headset: None,
         };
-        let entries = tray_menu_entries("vt9-air", &selected);
-        assert_eq!(ids(&entries), [Some("razer-viper-ultimate"), None, None]);
+        let resolved = resolve_selection("vt9-air", &selected);
+        assert_eq!(resolved.mouse.as_deref(), Some("razer-viper-ultimate"));
     }
 }

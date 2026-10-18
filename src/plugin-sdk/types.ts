@@ -41,7 +41,7 @@ export interface DeviceAdapter {
   detect: () => Promise<boolean>
   /**
    * 读电量。走壳层 `get_battery(deviceId)`。
-   * `fresh` 为真时绕过缓存再读一次；否则返回托盘正在用的那一次采样。
+   * `fresh` 为真时绕过缓存再读一次；否则返回这只设备最近一次采样（和托盘提示同一份）。
    */
   readBattery: (options?: { fresh?: boolean }) => Promise<BatteryInfo>
 }

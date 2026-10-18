@@ -5,6 +5,7 @@ use crate::devices;
 use crate::plugin_sdk::BatteryInfo;
 use crate::tray;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex};
 use std::thread;
@@ -32,7 +33,8 @@ struct Cache {
 
 struct Inner {
     flight: Option<Flight>,
-    cache: Option<Cache>,
+    /// 每只设备最近一次采样。托盘提示要同时列出它们。
+    samples: HashMap<String, Cache>,
     next_seq: u64,
 }
 
@@ -54,7 +56,7 @@ impl BatteryHub {
         Self {
             inner: Mutex::new(Inner {
                 flight: None,
-                cache: None,
+                samples: HashMap::new(),
                 next_seq: 1,
             }),
             flight_cvar: Condvar::new(),
@@ -77,7 +79,7 @@ impl BatteryHub {
     pub(crate) fn cache_covers(&self, device_id: &str, max_age: Duration) -> bool {
         let inner = self.lock_inner();
         let generation = self.generation.load(Ordering::SeqCst);
-        inner.cache.as_ref().is_some_and(|cache| {
+        inner.samples.get(device_id).is_some_and(|cache| {
             cache_matches(cache.generation, generation, &cache.device_id, device_id)
                 && sample_is_fresh(cache.at.elapsed(), max_age)
         })
@@ -131,7 +133,7 @@ pub(crate) fn read_shared(app: &AppHandle, device_id: &str, fresh: bool) -> Batt
         // 首页刚打开走非 fresh：缓存还对得上这只设备和这次切换就直接用，不再读 HID。
         // fresh 是周期采样和「立即刷新」，必须看到新数据。
         if !fresh {
-            if let Some(cache) = &inner.cache {
+            if let Some(cache) = inner.samples.get(device_id) {
                 if cache_matches(cache.generation, generation, &cache.device_id, device_id) {
                     return cache.info.clone();
                 }
@@ -181,31 +183,32 @@ pub(crate) fn read_shared(app: &AppHandle, device_id: &str, fresh: bool) -> Batt
         break seq;
     };
 
-    // 锁外读 HID。读完再看设备和代际有没有变；变了只叫醒等待方，不更新托盘和首页。
+    // 锁外读 HID。代际变了说明读的过程中换过设备，这次结果丢掉。
+    // 不是图标当前那一只的结果也要留下，托盘提示要列出每一只。
     let info = devices::read_battery(device_id);
     let publish = {
         let mut inner = hub.lock_inner();
         let now_gen = hub.generation.load(Ordering::SeqCst);
-        let tray_id = tray::read_stored_tray_device_id(app);
         let flight_gen = inner
             .flight
             .as_ref()
             .filter(|flight| flight.seq == seq)
             .map(|flight| flight.generation);
-        let publish = flight_gen.is_some_and(|generation| {
-            should_publish(generation, now_gen, device_id, &tray_id)
-        });
+        let publish = flight_gen.is_some_and(|generation| should_publish(generation, now_gen));
         if let Some(flight) = inner.flight.as_mut().filter(|flight| flight.seq == seq) {
             flight.done = true;
             flight.info = Some(info.clone());
         }
         if publish {
-            inner.cache = Some(Cache {
-                device_id: device_id.to_string(),
-                generation: now_gen,
-                info: info.clone(),
-                at: Instant::now(),
-            });
+            inner.samples.insert(
+                device_id.to_string(),
+                Cache {
+                    device_id: device_id.to_string(),
+                    generation: now_gen,
+                    info: info.clone(),
+                    at: Instant::now(),
+                },
+            );
         }
         hub.flight_cvar.notify_all();
         publish
@@ -243,21 +246,45 @@ fn emit_battery(app: &AppHandle, device_id: &str, info: &BatteryInfo) {
     }
 }
 
-fn cache_wait(hub: &BatteryHub, device_id: &str, interval: Duration) -> Duration {
+/// 当前图标设备先读，其余设备按插件表跟在后面。
+pub(crate) fn sample_order(active_id: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    if !active_id.is_empty() {
+        ids.push(active_id.to_string());
+    }
+    for meta in devices::list_meta() {
+        if meta.id != active_id {
+            ids.push(meta.id);
+        }
+    }
+    ids
+}
+
+/// 任何一只过期或还没读过，就马上再采。都还新鲜时，睡到最早过期的那一只。
+fn cache_wait(hub: &BatteryHub, interval: Duration) -> Duration {
     let inner = hub.lock_inner();
     let generation = hub.generation.load(Ordering::SeqCst);
-    match inner.cache.as_ref() {
-        Some(cache)
-            if cache_matches(cache.generation, generation, &cache.device_id, device_id) =>
-        {
-            interval.saturating_sub(cache.at.elapsed())
-        }
-        _ => Duration::ZERO,
+    let metas = devices::list_meta();
+    if metas.is_empty() {
+        return interval;
     }
+    let mut wait = interval;
+    for meta in metas {
+        match inner.samples.get(&meta.id) {
+            Some(cache)
+                if cache_matches(cache.generation, generation, &cache.device_id, &meta.id)
+                    && sample_is_fresh(cache.at.elapsed(), interval) =>
+            {
+                wait = wait.min(interval.saturating_sub(cache.at.elapsed()));
+            }
+            _ => return Duration::ZERO,
+        }
+    }
+    wait
 }
 
 fn run_loop(app: AppHandle) {
-    loop {
+    'sample: loop {
         let Some(state) = hub(&app) else {
             return;
         };
@@ -269,18 +296,26 @@ fn run_loop(app: AppHandle) {
         // 暂停只停周期采样。换设备仍然读一次，否则图标会停在上一只上。
         // 缓存还在间隔内，并且没有人要求立刻读，就睡到剩余时间，不重复开 HID。
         if refresh || auto {
-            let id = tray::read_stored_tray_device_id(&app);
+            let active = tray::read_stored_tray_device_id(&app);
             let interval = Duration::from_secs(tray::auto_interval_sec(&app));
-            let covered = hub(&app).is_some_and(|state| state.cache_covers(&id, interval));
-            if refresh || !covered {
-                let _info = read_shared(&app, &id, true);
-                let stale = hub(&app).is_none_or(|state| {
-                    state.generation.load(Ordering::SeqCst) != generation
-                        || tray::read_stored_tray_device_id(&app) != id
-                });
-                // 读的过程中设备又换了：这次结果已在 read_shared 里丢掉，马上读新的那只。
-                if stale {
-                    continue;
+            for id in sample_order(&active) {
+                let Some(state) = hub(&app) else {
+                    return;
+                };
+                if state.generation.load(Ordering::SeqCst) != generation {
+                    continue 'sample;
+                }
+                let covered = state.cache_covers(&id, interval);
+                drop(state);
+                if refresh || !covered {
+                    let _info = read_shared(&app, &id, true);
+                }
+                let Some(state) = hub(&app) else {
+                    return;
+                };
+                // 读的过程中换了图标设备：丢掉这一轮，从新的那只重新开始。
+                if state.generation.load(Ordering::SeqCst) != generation {
+                    continue 'sample;
                 }
             }
         }
@@ -302,8 +337,7 @@ fn run_loop(app: AppHandle) {
         }
 
         let interval = Duration::from_secs(tray::auto_interval_sec(&app));
-        let id = tray::read_stored_tray_device_id(&app);
-        let wait = cache_wait(&state, &id, interval);
+        let wait = cache_wait(&state, interval);
         if wait.is_zero() {
             continue;
         }
@@ -351,14 +385,15 @@ pub(crate) fn sample_is_fresh(age: Duration, interval: Duration) -> bool {
     age < interval
 }
 
-/// 读完时设备和代际都还是出发时的那一次，才能写到托盘和首页。
-pub(crate) fn should_publish(
-    flight_generation: u64,
-    now_generation: u64,
-    device_id: &str,
-    tray_id: &str,
-) -> bool {
-    flight_generation == now_generation && device_id == tray_id
+/// 代际没变，这次结果就属于被读的那只设备，可以写进托盘提示。
+/// 图标数字是否跟着更新，由托盘再看是不是当前选中的那一只。
+pub(crate) fn should_publish(flight_generation: u64, now_generation: u64) -> bool {
+    flight_generation == now_generation
+}
+
+/// 托盘图标上的数字只画当前选中的那一只。
+pub(crate) fn icon_follows(device_id: &str, tray_id: &str) -> bool {
+    device_id == tray_id
 }
 
 #[cfg(test)]
@@ -367,9 +402,22 @@ mod tests {
 
     #[test]
     fn stale_read_is_not_published() {
-        assert!(should_publish(1, 1, "vt9-air", "vt9-air"));
-        assert!(!should_publish(1, 2, "vt9-air", "vt9-air"));
-        assert!(!should_publish(1, 1, "vt9-air", "razer-viper-ultimate"));
+        assert!(should_publish(1, 1));
+        assert!(!should_publish(1, 2));
+        assert!(icon_follows("vt9-air", "vt9-air"));
+        assert!(!icon_follows("vt9-air", "razer-viper-ultimate"));
+    }
+
+    #[test]
+    fn sample_order_reads_the_icon_device_first() {
+        assert_eq!(
+            sample_order("mchose-a5-v3-ultra-plus"),
+            [
+                "mchose-a5-v3-ultra-plus",
+                "vt9-air",
+                "razer-viper-ultimate",
+            ]
+        );
     }
 
     #[test]

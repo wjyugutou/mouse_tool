@@ -9,7 +9,7 @@ mod vt9_air;
 
 use crate::plugin_sdk::{BatteryInfo, DeviceMeta, DevicePlugin};
 
-/// 构建期设备表。顺序即默认设备的顺序。托盘菜单只显示各分类里选中的那一只。
+/// 构建期设备表。顺序即默认设备和托盘菜单的顺序。托盘列出表里的每一只。
 static PLUGINS: &[&DevicePlugin] = &[&vt9_air::PLUGIN, &razer_viper_ultimate::PLUGIN, &mchose_a5_v3_ultra::PLUGIN];
 
 pub fn find(device_id: &str) -> Option<&'static DevicePlugin> {

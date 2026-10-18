@@ -21,7 +21,7 @@ interface SettingsState {
   closeBehavior: CloseBehavior
   /** 托盘图标当前显示哪一只的电量 */
   trayDeviceId: string
-  /** 托盘菜单里出现的设备：鼠标 / 键盘 / 耳机各至多一只 */
+  /** 首页侧栏每个分类高亮哪一只。托盘菜单另行列出全部设备。 */
   selectedByCategory: SelectedByCategory
   /** 是否开机自启（与系统注册表同步由设置页调用插件维护） */
   launchAtLogin: boolean
@@ -43,7 +43,7 @@ const DEFAULT_CLOSE_BEHAVIOR: CloseBehavior = 'tray'
 const DEFAULT_TRAY_DEVICE_ID = deviceRegistry[0]?.id ?? ''
 const DEFAULT_LAUNCH_AT_LOGIN = false
 
-/** 缺省三个分类都空着。显示时再按当前电量设备补，和托盘菜单同一条规则。 */
+/** 缺省三个分类都空着。侧栏显示时再按当前图标设备补上那一类。 */
 function emptySelection(): SelectedByCategory {
   return { mouse: null, keyboard: null, headset: null }
 }

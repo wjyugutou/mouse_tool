@@ -17,7 +17,7 @@ description: >-
 4. **注册只有这两个列表。**
    - 前端：`src/plugins/index.ts` 的 `deviceRegistry`，一只设备一行 import。
    - Rust：`src-tauri/src/devices/mod.rs` 的 `PLUGINS`，外加 `src-tauri/src/devices/` 下的模块。
-   - 托盘菜单和电量都走 `PLUGINS`，不要在 `tray.rs` 再列设备。菜单固定三行：鼠标 / 键盘 / 耳机，每行只放该分类里用户选中的那一只，没选时显示「未选择」。名称仍从 `PLUGINS` 取。选中项在设置 `selectedByCategory`，图标当前电量设备仍是 `trayDeviceId`。
+   - 托盘菜单和电量都走 `PLUGINS`，不要在 `tray.rs` 再列设备。菜单按鼠标 / 键盘 / 耳机分组，列出该分类里的每一只；某分类没有设备时显示「未选择」。悬停提示同样列出每一只的电量。名称仍从 `PLUGINS` 取。图标数字仍是 `trayDeviceId` 那一只。首页侧栏高亮仍是 `selectedByCategory`（每类至多一只）。
 5. **电量命令。** 只用 `get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`。禁止再加无参、隐含只支持 VT9 的 `get_battery`。
 6. **HID 按设备区分，不要一刀切。**
    - 默认，以及雷柏 VT9 AIR：只允许中断 `read_timeout`。禁止 `GetInputReport`、Feature report、控制传输（会卡死雷柏鼠标）。
