@@ -11,6 +11,7 @@
     "dev:app": "node ./node_modules/@tauri-apps/cli/tauri.js dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "check:card": "node scripts/check-battery-card.cjs",
     "version:sync": "node scripts/sync-version.mjs",
     "build:app": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-build.ps1",
     "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tauri-build.ps1",

@@ -1,23 +1,42 @@
-// 临时校验脚本：直接执行 BatteryCard.tsx 里的 levelFromInfo / statusText / hintText
-// 目的：确认「充电中拿不到百分比」不再显示成「等待数据 / 等待电量数据」。
-// 用完即删，不留在仓库里。
+/**
+ * BatteryCard 状态文案校验
+ *
+ * 为什么要这个脚本：项目没有前端测试框架，而 `BatteryCard.tsx` 里的
+ * `levelFromInfo` / `statusText` / `hintText` 是纯函数，它们的**判断顺序**直接决定
+ * 用户看到什么。顺序写反过一次（先判 `percent == null` 再判 `charging`），
+ * 导致插上充电线时显示「等待电量数据」，用户以为读不到电量。
+ *
+ * 做法：从 `BatteryCard.tsx` 源码里按名字抠出这三个函数，剥掉 TS 类型注解后
+ * 直接执行并断言文案。**直接跑源码，不是复制一份副本**，所以源码改了这里会跟着变，
+ * 不会出现「测试和实现不同步」。
+ *
+ * 用法：
+ *   node scripts/check-battery-card.cjs        # 或 pnpm run check:card
+ *
+ * 退出码 0 = 全部通过；1 = 有场景不符（可用于 CI / 提交前检查）。
+ *
+ * 维护提示：改了这三个函数的判断顺序或文案，请同步更新下面的 `cases` 期望值。
+ * 加新设备时如果引入了新的「无电量但有语义」的状态，也应在此补一个场景。
+ */
 const fs = require('node:fs')
 
 const src = fs.readFileSync('src/components/BatteryCard.tsx', 'utf8')
 
-// 从源文件里抠出三个纯函数 + 类型别名，去掉 TS 类型后执行。
+// 按名字从源码里定位一个函数，用括号深度扫描找到与之匹配的结束大括号。
 function extract(name) {
   const start = src.indexOf(`function ${name}(`)
-  if (start < 0) throw new Error(`找不到函数 ${name}`)
-  // 从函数开头找到与之匹配的结束大括号（按括号深度扫描）
+  if (start < 0)
+    throw new Error(`找不到函数 ${name}`)
   let depth = 0
   let i = src.indexOf('{', start)
-  const bodyStart = i
   for (; i < src.length; i++) {
-    if (src[i] === '{') depth++
+    if (src[i] === '{') {
+      depth++
+    }
     else if (src[i] === '}') {
       depth--
-      if (depth === 0) return src.slice(start, i + 1)
+      if (depth === 0)
+        return src.slice(start, i + 1)
     }
   }
   throw new Error(`函数 ${name} 未闭合`)
@@ -29,7 +48,8 @@ const stripped = ['levelFromInfo', 'statusText', 'hintText']
   .map((name) => {
     let body = extract(name)
     // 清掉参数列表里的类型注解：形如 `info: BatteryInfo | null,` / `error: string | null,`
-    body = body.replace(/:\s*[A-Za-z][\w.]*(\s*\|\s*(null|[A-Za-z][\w.]*))*/g, '')
+    // 第二个分支只需匹配标识符；`null` 已被 [A-Za-z][\w.]* 覆盖，不再单列（否则会重复回溯）
+    body = body.replace(/:\s*[A-Z][\w.]*(\s*\|\s*[A-Z][\w.]*)*/gi, '')
     // 上面会把三元里的 `? 'x' : 'y'` 也误伤成 `? 'x' 'y'`，这里补回来
     body = body.replace(/\?\s*('[^']*'|"[^"]*")\s+('[^']*'|"[^"]*")/g, `? $1 : $2`)
     return body
@@ -127,14 +147,18 @@ for (const c of cases) {
   const okLevel = c.level === c.expect.level
   const okStatus = c.status === c.expect.status
   const okHint = !c.hintMustContain || c.hint.includes(c.hintMustContain)
-  if (!okLevel || !okStatus || !okHint) failed++
+  if (!okLevel || !okStatus || !okHint)
+    failed++
   console.log(`${okLevel && okStatus && okHint ? '✓' : '✗'} ${c.name}`)
   console.log(`    level=${c.level}(显示「${levelLabel}」) status=「${c.status}」`)
   console.log(`    hint=「${c.hint}」`)
-  if (!okLevel) console.log(`    !! 期望 level=${c.expect.level}`)
-  if (!okStatus) console.log(`    !! 期望 status=${c.expect.status}`)
-  if (!okHint) console.log(`    !! hint 应包含「${c.hintMustContain}」`)
+  if (!okLevel)
+    console.log(`    !! 期望 level=${c.expect.level}`)
+  if (!okStatus)
+    console.log(`    !! 期望 status=${c.expect.status}`)
+  if (!okHint)
+    console.log(`    !! hint 应包含「${c.hintMustContain}」`)
 }
 
 console.log(`\n结果：${cases.length - failed}/${cases.length} 通过`)
-process.exit(failed === 0 ? 0 : 1)
+require('node:process').exit(failed === 0 ? 0 : 1)

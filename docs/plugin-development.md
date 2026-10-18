@@ -81,6 +81,21 @@ pnpm exec tsc --noEmit
 pnpm exec eslint src
 ```
 
+动了首页电量卡片（`src/components/BatteryCard.tsx`）再跑：
+
+```powershell
+pnpm run check:card
+```
+
+这个脚本从 `BatteryCard.tsx` 源码里直接抽取 `levelFromInfo` / `statusText` / `hintText`
+三个纯函数执行并断言文案，覆盖 6 个场景（充电有/无百分比、型号不支持、正常、
+已连接无电量、未连接）。项目没有前端测试框架，这是那三个纯函数的回归闸门——
+**它们的判断顺序直接决定用户看到什么**，顺序写反过一次：先判 `percent == null`
+再判 `charging`，导致 S9 Pro 充电时显示「等待电量数据」，用户以为读不到电量。
+
+改了这三个函数的顺序或文案，要同步更新脚本里的期望值；新增「无电量但有语义」的
+状态（像 `unsupported`）也要补一个场景。
+
 动了 Rust 再跑：
 
 ```powershell
