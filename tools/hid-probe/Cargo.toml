@@ -1,0 +1,11 @@
+[package]
+name = "hid-probe"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "hid-probe"
+path = "src/main.rs"
+
+[dependencies]
+hidapi = "2.6"

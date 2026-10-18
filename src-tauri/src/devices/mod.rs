@@ -5,12 +5,18 @@
 
 mod mchose_a5_v3_ultra;
 mod razer_viper_ultimate;
+mod vgn_s99;
 mod vt9_air;
 
 use crate::plugin_sdk::{BatteryInfo, DeviceMeta, DevicePlugin};
 
 /// 构建期设备表。顺序即默认设备和托盘菜单的顺序。托盘列出表里的每一只。
-static PLUGINS: &[&DevicePlugin] = &[&vt9_air::PLUGIN, &razer_viper_ultimate::PLUGIN, &mchose_a5_v3_ultra::PLUGIN];
+static PLUGINS: &[&DevicePlugin] = &[
+    &vt9_air::PLUGIN,
+    &razer_viper_ultimate::PLUGIN,
+    &mchose_a5_v3_ultra::PLUGIN,
+    &vgn_s99::PLUGIN,
+];
 
 pub fn find(device_id: &str) -> Option<&'static DevicePlugin> {
     PLUGINS
@@ -80,9 +86,15 @@ mod tests {
         assert_eq!(metas[2].id, "mchose-a5-v3-ultra-plus");
         assert_eq!(metas[2].name, "迈从 A5 V3 Ultra+");
         assert_eq!(metas[2].category, DeviceCategory::Mouse);
+        // 首只键盘设备
+        assert_eq!(metas[3].id, "vgn-s99");
+        assert_eq!(metas[3].name, "VGN S99");
+        assert_eq!(metas[3].description, "2.4G 无线机械键盘");
+        assert_eq!(metas[3].category, DeviceCategory::Keyboard);
         assert!(find("vt9-air").is_some());
         assert!(find("razer-viper-ultimate").is_some());
         assert!(find("mchose-a5-v3-ultra-plus").is_some());
+        assert!(find("vgn-s99").is_some());
         assert!(find("missing-mouse").is_none());
     }
 

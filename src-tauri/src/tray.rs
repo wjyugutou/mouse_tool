@@ -739,19 +739,26 @@ mod tests {
     #[test]
     fn menu_lists_every_device_and_keeps_empty_categories() {
         let entries = tray_menu_entries();
+        // 菜单列出 PLUGINS 里的每一只设备，之后补齐还没设备的分类。
+        // 不写死设备清单，避免以后新增设备时这条测试因为「多了一行」而红。
+        let registered = devices::list_meta();
         assert_eq!(
-            ids(&entries),
-            [
-                Some("vt9-air"),
-                Some("razer-viper-ultimate"),
-                Some("mchose-a5-v3-ultra-plus"),
-                None,
-                None,
-            ]
+            entries.len(),
+            registered.len() + 1,
+            "设备数 + 1 个空分类（耳机）"
         );
+
+        for (entry, meta) in entries.iter().zip(registered.iter()) {
+            assert_eq!(entry.id.as_deref(), Some(meta.id.as_str()));
+            assert_eq!(entry.category, meta.category);
+        }
+
+        // 最后一行是还没设备的分类；当前是耳机（前三只鼠标 + VGN 键盘已占位）。
+        let tail = entries.last().expect("至少有一行");
+        assert_eq!(tail.id, None, "末尾应是空分类");
+        assert_eq!(tail.category, DeviceCategory::Headset);
+
         assert_eq!(entries[0].category, DeviceCategory::Mouse);
-        assert_eq!(entries[3].category, DeviceCategory::Keyboard);
-        assert_eq!(entries[4].category, DeviceCategory::Headset);
         assert_eq!(
             menu_label(
                 true,
@@ -761,12 +768,26 @@ mod tests {
             ),
             "✓ 鼠标 · VT9 AIR · 88%"
         );
+
+        // 键盘那一行现在有 VGN S99，不再是「未选择」。
+        let keyboard_entry = entries
+            .iter()
+            .find(|entry| entry.category == DeviceCategory::Keyboard)
+            .expect("应有键盘分类");
+        assert_eq!(keyboard_entry.id.as_deref(), Some("vgn-s99"));
+        // 还没有电量样本时，菜单标签末尾是「读取中…」而不是「未选择」。
         assert_eq!(
-            menu_label(false, entries[3].category, None, None),
-            "键盘 · 未选择"
+            menu_label(
+                false,
+                DeviceCategory::Keyboard,
+                keyboard_entry.name.as_deref(),
+                None
+            ),
+            "键盘 · VGN S99 · 读取中…"
         );
+
         assert_eq!(
-            menu_label(false, entries[4].category, None, None),
+            menu_label(false, DeviceCategory::Headset, None, None),
             "耳机 · 未选择"
         );
     }
@@ -788,9 +809,23 @@ mod tests {
             "razer-viper-ultimate".into(),
             BatteryInfo::disconnected("毒蝰终极版 Viper Ultimate", "未连接"),
         );
+        let tooltip = tooltip_text("mchose-a5-v3-ultra-plus", &samples);
+        // 断言关键片段而不是整串，新增设备时不必改这条测试。
+        assert!(tooltip.contains("VT9 AIR · 读取中…"), "实际: {tooltip}");
+        assert!(
+            tooltip.contains("毒蝰终极版 Viper Ultimate · 未连接"),
+            "实际: {tooltip}"
+        );
+        assert!(
+            tooltip.contains("✓ 迈从 A5 V3 Ultra+ · 88%"),
+            "实际: {tooltip}"
+        );
+        assert!(tooltip.contains("VGN S99 · 读取中…"), "实际: {tooltip}");
+        // 每只已注册设备都应在提示里出现一次。
         assert_eq!(
-            tooltip_text("mchose-a5-v3-ultra-plus", &samples),
-            "VT9 AIR · 读取中…\n毒蝰终极版 Viper Ultimate · 未连接\n✓ 迈从 A5 V3 Ultra+ · 88%"
+            tooltip.lines().count(),
+            devices::list_meta().len(),
+            "提示行数应等于已注册设备数，实际: {tooltip}"
         );
     }
 

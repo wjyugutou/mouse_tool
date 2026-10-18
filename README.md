@@ -108,6 +108,7 @@ pnpm build:app
 | `vt9-air` | VT9 AIR | 雷柏 VT9 AIR；被动中断读 HID 电量（Report `0xBB`）。不要对它用 GetInputReport / Feature，会卡鼠标 |
 | `razer-viper-ultimate` | 毒蝰终极版 Viper Ultimate | 有线 `1532:007A` / 接收器 `1532:007B`；OpenRazer Feature（class `0x07` / cmd `0x80`）；充电状态同族命令 `0x84` |
 | `mchose-a5-v3-ultra-plus` | 迈从 A5 V3 Ultra+ | 2.4G 无线 · 3955 平台 |
+| `vgn-s99` | VGN S99 | 2.4G 无线机械键盘（首只 `keyboard` 分类）。接收器 `320F:5088` 的 `0xFF1C` 厂商接口，Output 报文 Report ID `0x04` + 命令 `0x1A` 查询，Input 中断读回。**不要用 Feature 报告**：该接口描述符无 `B1` 项，`HidD_SetFeature` 恒返回 `0x1`。HID 可能被 VGN VHUB 独占 |
 
 ## 🏗️ 项目结构
 

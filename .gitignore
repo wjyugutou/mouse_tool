@@ -33,3 +33,8 @@ dist-ssr
 !*.key.pub
 
 mouse_tool_updater_keys
+
+# HID 探针工具（tools/hid-probe/）：独立 crate，不参与 tauri build。
+# 源码可以留，但下面两类产物不入库：解包的厂商驱动源码与 Rust 编译产物。
+tools/hid-probe/vgn-asar/
+tools/hid-probe/target/

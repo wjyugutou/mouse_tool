@@ -410,14 +410,25 @@ mod tests {
 
     #[test]
     fn sample_order_reads_the_icon_device_first() {
-        assert_eq!(
-            sample_order("mchose-a5-v3-ultra-plus"),
-            [
-                "mchose-a5-v3-ultra-plus",
-                "vt9-air",
-                "razer-viper-ultimate",
-            ]
-        );
+        // 不写死设备清单：先读当前选中的那只，再按 PLUGINS 顺序补齐其余。
+        // 这样以后再加设备时这条测试不会因为「多了一只」而红。
+        let order = sample_order("mchose-a5-v3-ultra-plus");
+        assert_eq!(order.first().map(String::as_str), Some("mchose-a5-v3-ultra-plus"));
+        assert_eq!(order.len(), devices::list_meta().len());
+
+        let mut sorted_registered: Vec<_> = devices::list_meta().into_iter().map(|m| m.id).collect();
+        sorted_registered.sort();
+        let mut sorted_order = order.clone();
+        sorted_order.sort();
+        assert_eq!(sorted_order, sorted_registered, "sample_order 应覆盖全部已注册设备");
+
+        // 再确认一次顺序：第一项之后应严格按 PLUGINS 顺序，且不重复当前设备。
+        let expected: Vec<String> = devices::list_meta()
+            .into_iter()
+            .map(|m| m.id)
+            .filter(|id| id != "mchose-a5-v3-ultra-plus")
+            .collect();
+        assert_eq!(&order[1..], expected.as_slice());
     }
 
     #[test]
