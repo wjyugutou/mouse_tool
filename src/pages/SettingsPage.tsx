@@ -252,7 +252,7 @@ function AppearancePanel({
           <Input
             type="number"
             min={3}
-            max={300}
+            max={6000}
             step={1}
             className="w-36"
             value={autoIntervalSec}
