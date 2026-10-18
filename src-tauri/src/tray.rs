@@ -828,6 +828,7 @@ mod tests {
                 connected: true,
                 device: "迈从 A5 V3 Ultra+".into(),
                 detail: String::new(),
+                unsupported: false,
             },
         );
         samples.insert(

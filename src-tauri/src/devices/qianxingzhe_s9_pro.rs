@@ -279,6 +279,7 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
                 "已看到 {VENDOR_ID:04X} 设备，但没有 0xFF00 厂商接口。接口: {}",
                 enum_notes.join("; ")
             ),
+            unsupported: false,
         });
     };
 
@@ -295,11 +296,12 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
     let model = guess_model(pid);
 
     // 不是 S9 系列（例如 IPI 自家机型）：本插件不该认领，也不能拿它的电量。
+    // 采用 unsupported 而不是 disconnected：设备其实插着，说「未连接」会让用户去查线。
     if let ModelGuess::NotS9Series(other_pid) = model {
-        return Ok(BatteryInfo::disconnected(
+        return Ok(BatteryInfo::unsupported(
             device_label,
             format!(
-                "发现 VID {VENDOR_ID:04X} 的 PID 0x{other_pid:04X}，但不属于前行者 S9 系列，本插件不认领。"
+                "发现 VID {VENDOR_ID:04X} 的 PID 0x{other_pid:04X}，属于 IPI 同厂其它机型，不属于前行者 S9 系列，本插件不认领。"
             ),
         ));
     }
@@ -311,16 +313,14 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
             0x105E => "S9 Max",
             _ => "同系列其它型号",
         };
-        return Ok(BatteryInfo {
-            percent: None,
-            charging: None,
-            connected: true,
-            // 如实报设备名，不冒充 Pro 的电量口径
-            device: format!("前行者 {name}（未支持）"),
-            detail: format!(
+        // 用 unsupported 而不是普通「无电量」：界面要直说「型号不支持」，
+        // 否则用户会看到「等待鼠标唤醒」去查设备，那是误导。
+        return Ok(BatteryInfo::unsupported(
+            format!("前行者 {name}（未支持）"),
+            format!(
                 "检测到 {name}（有线 PID 0x{other_pid:04X}），本版只适配 S9 Pro，暂不读取电量。"
             ),
-        });
+        ));
     }
 
     let device_name = if product.is_empty() {
@@ -356,7 +356,8 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
                 connected: true,
                 device: device_name,
                 detail,
-            })
+            unsupported: false,
+        })
         }
         // 打不开 / 写不进去 = 此刻拿不到设备
         Err(ReadError::Write(err)) => Ok(BatteryInfo::disconnected(
@@ -372,6 +373,7 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
             detail: format!(
                 "已连接接收器，但没读到电量: {err}。请确认鼠标已开机并与接收器配对。"
             ),
+            unsupported: false,
         }),
     }
 }

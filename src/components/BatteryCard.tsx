@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty' | 'charging'
+type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty' | 'charging' | 'unsupported'
 
 interface Props {
   deviceName: string
@@ -26,6 +26,7 @@ const LEVEL_LABEL: Record<BatteryLevel, string> = {
   unknown: '等待数据',
   empty: '未连接',
   charging: '充电中',
+  unsupported: '型号不支持',
 }
 
 const LEVEL_STROKE: Record<BatteryLevel, string> = {
@@ -35,6 +36,7 @@ const LEVEL_STROKE: Record<BatteryLevel, string> = {
   unknown: 'text-muted-foreground/35',
   empty: 'text-border',
   charging: 'text-sky-500 dark:text-sky-400',
+  unsupported: 'text-muted-foreground/60',
 }
 
 const LEVEL_GLOW: Record<BatteryLevel, string> = {
@@ -44,11 +46,15 @@ const LEVEL_GLOW: Record<BatteryLevel, string> = {
   unknown: 'bg-primary/5',
   empty: 'bg-transparent',
   charging: 'bg-sky-500/10',
+  unsupported: 'bg-muted/40',
 }
 
 function levelFromInfo(info: BatteryInfo | null): BatteryLevel {
   if (!info)
     return 'unknown'
+  // 型号不支持：设备插着、但本版读不了，显示「未连接」会让人以为没插。
+  if (info.unsupported)
+    return 'unsupported'
   if (!info.connected)
     return 'empty'
   // 充电中必须先判：部分设备充电时拿不到百分比（如前行者 S9 Pro 的 0xE4 哨兵值），
@@ -81,6 +87,10 @@ function statusText(
     return loading ? '正在读取…' : '等待读取'
   if (!info || !info.connected)
     return '设备未连接'
+  // 型号不受支持：必须直说，不能落到下面「等待电量数据」，
+  // 否则用户会去查鼠标开机/重插接收器，而真正原因是这只设备本版不支持。
+  if (info.unsupported)
+    return '该型号暂不支持'
   // 充电中要说「充电中」，不能因为拿不到百分比就说「等待电量数据」。
   if (info.charging)
     return '充电中'
@@ -103,6 +113,10 @@ function hintText(
     return loading ? '正在从设备读取 HID 数据。' : '准备读取设备状态。'
   if (!info || !info.connected)
     return '未检测到接收器或设备，请检查连接后重试。'
+  // 型号不支持时，原因写在 detail 里（后端给出具体型号），直接显示给用户看。
+  if (info.unsupported) {
+    return info.detail || '检测到的设备型号不在本版支持范围内。'
+  }
   // 充电中优先说明「正在充电」，而不是让人以为读不到数据。
   if (info.charging) {
     return info.percent == null

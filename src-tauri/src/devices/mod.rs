@@ -114,6 +114,29 @@ mod tests {
         assert_eq!(info.device, "missing-mouse");
         assert!(info.detail.contains("未知设备"));
         assert!(info.percent.is_none());
+        // 未知设备不是「型号不支持」——那是「设备在、但不属于本插件」的专门状态。
+        assert!(!info.unsupported);
+    }
+
+    /// `unsupported` 与 `disconnected` 必须是两个不同状态。
+    ///
+    /// 前端靠它决定文案：`unsupported` 要直说「该型号暂不支持」并显示具体型号；
+    /// `disconnected` 才提示去检查接收器/开机。混用会让用户对着不支持的型号
+    /// 反复拔插设备，问题永远解决不了。
+    #[test]
+    fn unsupported_is_not_disconnected() {
+        let info = BatteryInfo::unsupported("前行者 S9 Ultra（未支持）", "本版只适配 S9 Pro");
+        assert!(info.unsupported, "unsupported() 必须置 unsupported=true");
+        assert!(
+            info.connected,
+            "设备其实插着，不能报未连接，否则界面会引导用户去查线"
+        );
+        assert!(info.percent.is_none());
+        assert!(info.detail.contains("S9 Pro"));
+
+        let gone = BatteryInfo::disconnected("前行者 S9 Pro", "未找到接收器");
+        assert!(!gone.unsupported);
+        assert!(!gone.connected);
     }
 
     /// 实机验证：需要前行者 S9 Pro 接收器插在本机。

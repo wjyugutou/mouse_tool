@@ -134,6 +134,7 @@ fn read_mchose_a5_v3_ultra_battery() -> Result<BatteryInfo, String> {
             detail: format!(
                 "未找到迈从电量命令集合（VID {MCHOSE_VID:04X} PID {RECEIVER_PID:04X}）。{hint}{dock}"
             ),
+            unsupported: false,
         });
     }
 
@@ -194,6 +195,7 @@ fn read_mchose_a5_v3_ultra_battery() -> Result<BatteryInfo, String> {
             "已看到迈从接收器，但没读到电量。请确认鼠标已开机并与接收器 2.4G 配对，然后动一下唤醒；若开着官方 M HUB 请先关掉（HID 会被占用）。{dock_note} 明细：{}",
             errors.join(" · ")
         ),
+        unsupported: false,
     })
 }
 
@@ -335,6 +337,7 @@ fn parse_mailbox_info(data: &[u8]) -> Result<BatteryInfo, String> {
             "model {model:#06X} · connect={connect} · {} · {level}%",
             if charging { "充电中" } else { "未充电" }
         ),
+        unsupported: false,
     })
 }
 
@@ -435,6 +438,7 @@ fn parse_legacy_status(resp: &[u8]) -> Result<BatteryInfo, String> {
             "model {model:#06X} · flags {flags:#04X} · {} · {level}%",
             if charging { "充电中" } else { "未充电" }
         ),
+        unsupported: false,
     })
 }
 

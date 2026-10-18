@@ -77,6 +77,7 @@ fn read_viper_ultimate_battery() -> Result<BatteryInfo, String> {
             detail: format!(
                 "未找到 Viper Ultimate（VID {RAZER_VID:04X}，有线 PID {WIRED_PID:04X} / 接收器 PID {DONGLE_PID:04X}）。"
             ),
+            unsupported: false,
         });
     }
     candidates.sort_by_key(|(pid, iface, _)| candidate_rank(*pid, *iface));
@@ -109,6 +110,7 @@ fn read_viper_ultimate_battery() -> Result<BatteryInfo, String> {
         connected: true,
         device: device_label,
         detail: format!("已看到设备，但 Feature 读电量失败。{}", errors.join(" | ")),
+        unsupported: false,
     })
 }
 
@@ -138,6 +140,7 @@ fn read_open_device(device: &HidDevice) -> Result<BatteryInfo, String> {
         detail: format!(
             "Feature SET_REPORT/GET_REPORT class {CMD_CLASS:#04X} cmd {CMD_BATTERY:#04X} · raw {level}/255 · {charge_text}"
         ),
+        unsupported: false,
     })
 }
 

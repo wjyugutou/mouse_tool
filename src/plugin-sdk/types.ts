@@ -6,6 +6,14 @@ export interface BatteryInfo {
   connected: boolean
   device: string
   detail: string
+  /**
+   * 已连接但**这只设备本身不受支持**（例如插的是同系列其它型号）。
+   *
+   * 与「读不到电量」区分开：那种情况用户该检查鼠标是否开机、重插接收器；
+   * 而这种情况用户做什么都没用，界面不能给误导性的排障提示。
+   * 缺省（undefined / null）等同 false，旧插件不用改。
+   */
+  unsupported?: boolean
 }
 
 /** 一级分类。顺序即首页分类栏顺序，与 Rust `DeviceCategory` 一致。 */

@@ -36,14 +36,18 @@ const stripped = ['levelFromInfo', 'statusText', 'hintText']
   })
   .join('\n')
 
-const LEVEL_LABEL = {
-  high: '电量充足',
-  mid: '电量正常',
-  low: '电量偏低',
-  unknown: '等待数据',
-  empty: '未连接',
-  charging: '充电中',
-}
+// LEVEL_LABEL 直接从源文件解析，避免脚本里再手抄一份（抄一份就会和源码不同步）。
+// 形如：  high: '电量充足',
+const labelBlock = src.slice(
+  src.indexOf('const LEVEL_LABEL'),
+  src.indexOf('}', src.indexOf('const LEVEL_LABEL')),
+)
+const LEVEL_LABEL = {}
+for (const m of labelBlock.matchAll(/(\w+):\s*'([^']*)'/g))
+  LEVEL_LABEL[m[1]] = m[2]
+
+if (Object.keys(LEVEL_LABEL).length === 0)
+  throw new Error('没能从源文件解析出 LEVEL_LABEL')
 
 // eslint-disable-next-line no-new-func
 const factory = new Function(`${stripped}
@@ -61,8 +65,24 @@ const normal = { connected: true, charging: null, percent: 80 }
 const connectedNoPercent = { connected: true, charging: null, percent: null }
 // 未连接
 const offline = { connected: false, charging: null, percent: null }
+// 型号不受支持（插上 S9 Ultra / Max 或 IPI 自家机型时的形态）
+const unsupportedModel = {
+  connected: true,
+  charging: null,
+  percent: null,
+  unsupported: true,
+  detail: '检测到 S9 Ultra（有线 PID 0x1027），本版只适配 S9 Pro，暂不读取电量。',
+}
 
 const cases = [
+  {
+    name: '型号不受支持（插上 Ultra/Max 等）',
+    level: fn.levelFromInfo(unsupportedModel),
+    status: fn.statusText(unsupportedModel, false, null),
+    hint: fn.hintText(unsupportedModel, false, null, true),
+    expect: { level: 'unsupported', status: '该型号暂不支持' },
+    hintMustContain: 'S9 Ultra',
+  },
   {
     name: '充电中且拿不到百分比（S9 Pro 真机形态）',
     level: fn.levelFromInfo(chargingNoPercent),
@@ -106,12 +126,14 @@ for (const c of cases) {
   const levelLabel = fn.LEVEL_LABEL[c.level]
   const okLevel = c.level === c.expect.level
   const okStatus = c.status === c.expect.status
-  if (!okLevel || !okStatus) failed++
-  console.log(`${okLevel && okStatus ? '✓' : '✗'} ${c.name}`)
+  const okHint = !c.hintMustContain || c.hint.includes(c.hintMustContain)
+  if (!okLevel || !okStatus || !okHint) failed++
+  console.log(`${okLevel && okStatus && okHint ? '✓' : '✗'} ${c.name}`)
   console.log(`    level=${c.level}(显示「${levelLabel}」) status=「${c.status}」`)
   console.log(`    hint=「${c.hint}」`)
   if (!okLevel) console.log(`    !! 期望 level=${c.expect.level}`)
   if (!okStatus) console.log(`    !! 期望 status=${c.expect.status}`)
+  if (!okHint) console.log(`    !! hint 应包含「${c.hintMustContain}」`)
 }
 
 console.log(`\n结果：${cases.length - failed}/${cases.length} 通过`)

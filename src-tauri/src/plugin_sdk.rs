@@ -31,6 +31,12 @@ pub struct BatteryInfo {
     pub connected: bool,
     pub device: String,
     pub detail: String,
+    /// 已连接，但这只设备本身不受该插件支持（例如插的是同系列其它型号）。
+    ///
+    /// 与「读不到电量」区分开：前者用户重插/开机都没用，界面不该给排障提示。
+    /// `#[serde(default)]` 让旧插件与旧数据不用改；序列化时总是带上（false）。
+    #[serde(default)]
+    pub unsupported: bool,
 }
 
 impl BatteryInfo {
@@ -41,6 +47,19 @@ impl BatteryInfo {
             connected: false,
             device: device.into(),
             detail: detail.into(),
+            unsupported: false,
+        }
+    }
+
+    /// 已连接，但型号不受支持。界面上要把原因说清楚，不能只说「读不到电量」。
+    pub fn unsupported(device: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self {
+            percent: None,
+            charging: None,
+            connected: true,
+            device: device.into(),
+            detail: detail.into(),
+            unsupported: true,
         }
     }
 }
