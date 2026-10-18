@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty'
+type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty' | 'charging'
 
 interface Props {
   deviceName: string
@@ -25,6 +25,7 @@ const LEVEL_LABEL: Record<BatteryLevel, string> = {
   low: '电量偏低',
   unknown: '等待数据',
   empty: '未连接',
+  charging: '充电中',
 }
 
 const LEVEL_STROKE: Record<BatteryLevel, string> = {
@@ -33,6 +34,7 @@ const LEVEL_STROKE: Record<BatteryLevel, string> = {
   low: 'text-red-500 dark:text-red-400',
   unknown: 'text-muted-foreground/35',
   empty: 'text-border',
+  charging: 'text-sky-500 dark:text-sky-400',
 }
 
 const LEVEL_GLOW: Record<BatteryLevel, string> = {
@@ -41,6 +43,7 @@ const LEVEL_GLOW: Record<BatteryLevel, string> = {
   low: 'bg-red-500/10',
   unknown: 'bg-primary/5',
   empty: 'bg-transparent',
+  charging: 'bg-sky-500/10',
 }
 
 function levelFromInfo(info: BatteryInfo | null): BatteryLevel {
@@ -48,6 +51,10 @@ function levelFromInfo(info: BatteryInfo | null): BatteryLevel {
     return 'unknown'
   if (!info.connected)
     return 'empty'
+  // 充电中必须先判：部分设备充电时拿不到百分比（如前行者 S9 Pro 的 0xE4 哨兵值），
+  // 若先判 percent == null 会落到「等待数据」，用户会误以为读不到电量。
+  if (info.charging)
+    return 'charging'
   if (info.percent == null)
     return 'unknown'
   if (info.percent <= 15)
@@ -74,10 +81,11 @@ function statusText(
     return loading ? '正在读取…' : '等待读取'
   if (!info || !info.connected)
     return '设备未连接'
-  if (info.percent == null)
-    return '等待电量数据'
+  // 充电中要说「充电中」，不能因为拿不到百分比就说「等待电量数据」。
   if (info.charging)
     return '充电中'
+  if (info.percent == null)
+    return '等待电量数据'
   if (info.percent <= 15)
     return '电量偏低'
   return '运行正常'
@@ -95,10 +103,14 @@ function hintText(
     return loading ? '正在从设备读取 HID 数据。' : '准备读取设备状态。'
   if (!info || !info.connected)
     return '未检测到接收器或设备，请检查连接后重试。'
+  // 充电中优先说明「正在充电」，而不是让人以为读不到数据。
+  if (info.charging) {
+    return info.percent == null
+      ? '正在充电。该设备充电时不上报百分比，充满或拔线后会自动更新。'
+      : '正在充电，充满后会自动更新。'
+  }
   if (info.percent == null)
     return '接收器已连接，等待鼠标唤醒。动一下鼠标或重新插拔接收器。'
-  if (info.charging)
-    return '正在充电，充满后会自动更新。'
   if (info.percent <= 15)
     return '建议尽快充电。'
   return auto ? '自动刷新已开启，电量会按间隔更新。' : '自动刷新已暂停，可随时手动刷新。'
