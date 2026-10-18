@@ -3,13 +3,14 @@
 //! 新增鼠标：加上模块，并在 [`PLUGINS`] 追加一行。
 //! 托盘和 `get_battery` 都读这张表，不要再维护第二份设备列表。
 
+mod mchose_a5_v3_ultra;
 mod razer_viper_ultimate;
 mod vt9_air;
 
 use crate::plugin_sdk::{BatteryInfo, DeviceMeta, DevicePlugin};
 
 /// 构建期设备表。顺序即默认设备的顺序。托盘菜单只显示各分类里选中的那一只。
-static PLUGINS: &[&DevicePlugin] = &[&vt9_air::PLUGIN, &razer_viper_ultimate::PLUGIN];
+static PLUGINS: &[&DevicePlugin] = &[&vt9_air::PLUGIN, &razer_viper_ultimate::PLUGIN, &mchose_a5_v3_ultra::PLUGIN];
 
 pub fn find(device_id: &str) -> Option<&'static DevicePlugin> {
     PLUGINS
@@ -86,8 +87,12 @@ mod tests {
         assert_eq!(metas[1].id, "razer-viper-ultimate");
         assert_eq!(metas[1].name, "毒蝰终极版 Viper Ultimate");
         assert_eq!(metas[1].category, DeviceCategory::Mouse);
+        assert_eq!(metas[2].id, "mchose-a5-v3-ultra-plus");
+        assert_eq!(metas[2].name, "迈从 A5 V3 Ultra+");
+        assert_eq!(metas[2].category, DeviceCategory::Mouse);
         assert!(find("vt9-air").is_some());
         assert!(find("razer-viper-ultimate").is_some());
+        assert!(find("mchose-a5-v3-ultra-plus").is_some());
         assert!(find("missing-mouse").is_none());
     }
 

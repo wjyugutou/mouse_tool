@@ -7,7 +7,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,14 @@ import {
 } from '@/stores/settings'
 
 type SectionId = 'appearance' | 'about'
+
+interface AutostartDiagnostic {
+  currentExe: string
+  registryValue: string | null
+  registryExe: string | null
+  pathsMatch: boolean
+  systemEnabled: boolean
+}
 
 const SECTIONS: { id: SectionId, label: string }[] = [
   { id: 'appearance', label: '外观' },
@@ -179,9 +187,26 @@ function AppearancePanel({
   onAutoIntervalSecChange: (sec: number) => void
   onThemeModeChange: (mode: ThemeMode) => void
   onCloseBehaviorChange: (behavior: CloseBehavior) => void
-  onLaunchAtLoginChange: (on: boolean) => void
+  onLaunchAtLoginChange: (on: boolean) => void | Promise<void>
 }) {
   const closeToTray = (closeBehavior ?? 'tray') === 'tray'
+  const [autostartDiag, setAutostartDiag] = useState<AutostartDiagnostic | null>(null)
+
+  const loadAutostartDiag = useCallback(async () => {
+    if (import.meta.env.DEV)
+      return
+    try {
+      const d = await invoke<AutostartDiagnostic>('get_autostart_diagnostic')
+      setAutostartDiag(d)
+    }
+    catch {
+      setAutostartDiag(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAutostartDiag()
+  }, [loadAutostartDiag, launchAtLogin])
 
   return (
     <div className="space-y-6">
@@ -262,7 +287,10 @@ function AppearancePanel({
                       <Checkbox
                         checked={launchAtLogin}
                         onCheckedChange={(checked) => {
-                          onLaunchAtLoginChange(checked === true)
+                          void (async () => {
+                            await onLaunchAtLoginChange(checked === true)
+                            await loadAutostartDiag()
+                          })()
                         }}
                         aria-label="开机自启"
                       />
@@ -271,11 +299,47 @@ function AppearancePanel({
                     <p className="text-muted-foreground text-xs">
                       勾选后随系统启动，只进托盘；双击托盘图标再打开窗口。
                     </p>
+                    {autostartDiag
+                      ? (
+                          <AutostartDiagnosticPanel diagnostic={autostartDiag} />
+                        )
+                      : null}
                   </div>
                 )
           }
         </div>
       </div>
+    </div>
+  )
+}
+
+function AutostartDiagnosticPanel({ diagnostic }: { diagnostic: AutostartDiagnostic }) {
+  const mismatch = diagnostic.systemEnabled && !diagnostic.pathsMatch
+
+  return (
+    <div className="bg-muted/40 mt-1 max-w-xl rounded-lg border border-border px-3 py-2 text-xs">
+      <p className="text-muted-foreground mb-1.5 font-medium">开机自启路径诊断</p>
+      <dl className="space-y-1 break-all font-mono">
+        <div>
+          <dt className="text-muted-foreground inline">当前 exe：</dt>
+          <dd className="inline">{diagnostic.currentExe || '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground inline">注册表 exe：</dt>
+          <dd className="inline">{diagnostic.registryExe ?? '（未写入 Run）'}</dd>
+        </div>
+      </dl>
+      {mismatch
+        ? (
+            <p className="text-destructive mt-2">
+              路径不一致，开机可能无法启动；请关闭再开启自启，或重启本应用以自动修正。
+            </p>
+          )
+        : (
+            <p className="text-muted-foreground mt-2">
+              {diagnostic.systemEnabled ? '路径一致。' : '系统自启未开启。'}
+            </p>
+          )}
     </div>
   )
 }

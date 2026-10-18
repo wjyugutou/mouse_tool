@@ -6,13 +6,35 @@
 //! - 设置、更新、日志留在壳层，不做成插件
 
 mod app_log;
+mod autostart_diag;
 mod devices;
 mod plugin_sdk;
 mod tray;
 
 use devices::{get_battery, list_devices};
 use tauri::Manager;
+use tauri_plugin_autostart::ManagerExt;
 use tray::{close_behavior, set_tray_device, setup_tray};
+
+/// 安装/升级/改目录后 Run 项可能仍指向旧路径；若自启仍开启则用当前 exe 重写注册表。
+fn refresh_autostart_exe_path(app: &tauri::App) {
+    autostart_diag::log_startup(app.handle());
+    let diag = autostart_diag::collect(app.handle());
+    if !diag.system_enabled {
+        return;
+    }
+    if diag.paths_match {
+        return;
+    }
+    if let Err(e) = app.autolaunch().enable() {
+        app_log::warn(&format!("autostart refresh enable failed: {e}"));
+        return;
+    }
+    app_log::info(&format!(
+        "autostart: refreshed Run entry (was registry_exe={})",
+        diag.registry_exe.as_deref().unwrap_or("(none)")
+    ));
+}
 
 /// 返回日志文件绝对路径，供设置页展示 / 打开目录。
 #[tauri::command]
@@ -73,6 +95,7 @@ pub fn run() {
                 app_log::error(&format!("setup_tray failed: {e}"));
                 return Err(e.into());
             }
+            refresh_autostart_exe_path(app);
             let from_autostart = std::env::args().any(|a| a == "--autostart");
             app_log::info(&format!("from_autostart={from_autostart}"));
             if !from_autostart {
@@ -108,7 +131,8 @@ pub fn run() {
             list_devices,
             get_log_path,
             open_log_dir,
-            set_tray_device
+            set_tray_device,
+            autostart_diag::get_autostart_diagnostic
         ])
         .run(tauri::generate_context!());
 

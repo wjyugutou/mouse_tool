@@ -5373,6 +5373,8 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-updater",
  "tauri-plugin-zustand",
+ "windows-registry",
+ "windows-result",
 ]
 
 [[package]]
