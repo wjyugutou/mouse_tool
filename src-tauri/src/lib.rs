@@ -1,17 +1,20 @@
 //! yugutou_tool · 后端（Tauri）
 //!
 //! - 设备电量由构建期插件提供（`devices::PLUGINS`），命令是 `get_battery(device_id)`
+//! - 首页和托盘共用同一次采样，不再各读一遍 HID
 //! - 只允许 HID 中断读；勿用 GetInputReport，会卡死鼠标
 //! - 托盘显示电量：单击切已选的鼠标/键盘/耳机，双击打开主窗口；关窗可隐藏到托盘
 //! - 设置、更新、日志留在壳层，不做成插件
 
 mod app_log;
 mod autostart_diag;
+mod battery;
 mod devices;
 mod plugin_sdk;
 mod tray;
 
-use devices::{get_battery, list_devices};
+use battery::get_battery;
+use devices::list_devices;
 use tauri::Manager;
 use tauri_plugin_autostart::ManagerExt;
 use tray::{close_behavior, set_tray_device, setup_tray};

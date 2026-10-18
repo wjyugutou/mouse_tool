@@ -68,6 +68,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         });
     }
 
+    let mut open_errors = Vec::new();
     for (pid, iface, path) in vendor_paths {
         let c_path = match std::ffi::CString::new(path) {
             Ok(p) => p,
@@ -75,14 +76,10 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         };
         let device = match api.open_path(c_path.as_c_str()) {
             Ok(d) => d,
+            // 这一条打不开就试下一条。前一条被占用时直接返回，后面可用的接口也读不到。
             Err(e) => {
-                return Ok(BatteryInfo {
-                    percent: None,
-                    charging: None,
-                    connected: true,
-                    device: format!("Rapoo {RAPOO_VID:04X}:{pid:04X}"),
-                    detail: format!("打开失败: {e} · 接口: {summary}"),
-                });
+                open_errors.push(format!("pid={pid:04X} iface={iface} 打开失败: {e}"));
+                continue;
             }
         };
 
@@ -147,12 +144,17 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         });
     }
 
+    let open_note = if open_errors.is_empty() {
+        String::new()
+    } else {
+        format!(" {}。", open_errors.join(" | "))
+    };
     Ok(BatteryInfo {
         percent: None,
         charging: None,
         connected: true,
         device: device_label,
-        detail: format!("未找到含 Report 0xBB 的集合。接口: {summary}"),
+        detail: format!("未找到含 Report 0xBB 的集合。{open_note}接口: {summary}"),
     })
 }
 

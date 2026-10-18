@@ -25,11 +25,14 @@ interface SettingsState {
   selectedByCategory: SelectedByCategory
   /** 是否开机自启（与系统注册表同步由设置页调用插件维护） */
   launchAtLogin: boolean
+  /** 首页和托盘共用的自动采样开关 */
+  autoRefresh: boolean
   setAutoIntervalSec: (sec: number) => void
   setThemeMode: (mode: ThemeMode) => void
   setCloseBehavior: (behavior: CloseBehavior) => void
   setTrayDeviceId: (id: string) => void
   setLaunchAtLogin: (on: boolean) => void
+  setAutoRefresh: (on: boolean) => void
   reset: () => void
 }
 
@@ -40,16 +43,9 @@ const DEFAULT_CLOSE_BEHAVIOR: CloseBehavior = 'tray'
 const DEFAULT_TRAY_DEVICE_ID = deviceRegistry[0]?.id ?? ''
 const DEFAULT_LAUNCH_AT_LOGIN = false
 
+/** 缺省三个分类都空着。显示时再按当前电量设备补，和托盘菜单同一条规则。 */
 function emptySelection(): SelectedByCategory {
   return { mouse: null, keyboard: null, headset: null }
-}
-
-function defaultSelectedByCategory(): SelectedByCategory {
-  const selected = emptySelection()
-  const device = getDeviceById(DEFAULT_TRAY_DEVICE_ID)
-  if (device)
-    selected[device.category] = device.id
-  return selected
 }
 
 function keptDeviceId(id: string | null | undefined, category: DeviceCategory): string | null {
@@ -63,7 +59,8 @@ function keptDeviceId(id: string | null | undefined, category: DeviceCategory): 
 
 /**
  * 丢掉不存在或分类对不上的 id。
- * 当前电量设备所在分类还空着时，用它补上，这样旧设置里只有 `trayDeviceId` 也能出菜单。
+ * 当前电量设备所在分类还空着时，用它补上。
+ * 缺省不预填第一只设备，否则旧设置里只有 `trayDeviceId` 时，鼠标槽会停在注册表第一项。
  */
 export function resolveSelectedByCategory(
   trayDeviceId: string,
@@ -92,8 +89,9 @@ export const useSettingsStore = create<SettingsState>(set => ({
   themeMode: DEFAULT_THEME_MODE,
   closeBehavior: DEFAULT_CLOSE_BEHAVIOR,
   trayDeviceId: DEFAULT_TRAY_DEVICE_ID,
-  selectedByCategory: defaultSelectedByCategory(),
+  selectedByCategory: emptySelection(),
   launchAtLogin: DEFAULT_LAUNCH_AT_LOGIN,
+  autoRefresh: true,
   setAutoIntervalSec: sec => set({ autoIntervalSec: clampInterval(sec) }),
   setThemeMode: themeMode => set({ themeMode }),
   setCloseBehavior: closeBehavior => set({ closeBehavior }),
@@ -110,14 +108,16 @@ export const useSettingsStore = create<SettingsState>(set => ({
     }))
   },
   setLaunchAtLogin: launchAtLogin => set({ launchAtLogin }),
+  setAutoRefresh: autoRefresh => set({ autoRefresh }),
   reset: () =>
     set({
       autoIntervalSec: DEFAULT_AUTO_INTERVAL_SEC,
       themeMode: DEFAULT_THEME_MODE,
       closeBehavior: DEFAULT_CLOSE_BEHAVIOR,
       trayDeviceId: DEFAULT_TRAY_DEVICE_ID,
-      selectedByCategory: defaultSelectedByCategory(),
+      selectedByCategory: emptySelection(),
       launchAtLogin: DEFAULT_LAUNCH_AT_LOGIN,
+      autoRefresh: true,
     }),
 }))
 
@@ -135,6 +135,7 @@ export const settingsTauriStore = createTauriStore(
       'trayDeviceId',
       'selectedByCategory',
       'launchAtLogin',
+      'autoRefresh',
     ],
     filterKeysStrategy: 'pick',
     saveOnChange: true,

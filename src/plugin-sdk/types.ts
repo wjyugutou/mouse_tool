@@ -39,6 +39,9 @@ export interface DeviceAdapter {
   category: DeviceCategory
   /** 当前是否值得尝试读电量 */
   detect: () => Promise<boolean>
-  /** 读电量。默认走壳层命令 `get_battery(deviceId)` */
-  readBattery: () => Promise<BatteryInfo>
+  /**
+   * 读电量。走壳层 `get_battery(deviceId)`。
+   * `fresh` 为真时绕过缓存再读一次；否则返回托盘正在用的那一次采样。
+   */
+  readBattery: (options?: { fresh?: boolean }) => Promise<BatteryInfo>
 }

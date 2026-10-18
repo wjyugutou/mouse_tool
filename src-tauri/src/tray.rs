@@ -1,10 +1,13 @@
-//! 系统托盘：电量图标、设备菜单、后台刷新
+//! 系统托盘：电量图标、设备菜单。电量采样在 `battery`，这里只负责画出来。
 
 use crate::app_log;
+use crate::battery;
 use crate::devices;
 use crate::plugin_sdk::{BatteryInfo, DeviceCategory, DeviceMeta};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Mutex;
+use std::thread;
 use std::time::Duration;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -15,7 +18,7 @@ use tauri::{AppHandle, Manager};
 const DEFAULT_AUTO_INTERVAL_SEC: u64 = 300;
 
 /// Read auto refresh interval (seconds) from zustand settings store.
-fn auto_interval_sec(app: &AppHandle) -> u64 {
+pub(crate) fn auto_interval_sec(app: &AppHandle) -> u64 {
     use tauri_plugin_zustand::ManagerExt;
     let raw = app
         .zustand()
@@ -23,9 +26,11 @@ fn auto_interval_sec(app: &AppHandle) -> u64 {
     raw.clamp(3, 300)
 }
 
-struct TrayUiState {
-    /// 当前托盘展示哪只鼠标的电量
-    selected_id: Mutex<String>,
+/// 首页「暂停自动刷新」写在同一份 settings store 里。缺省开启。
+pub(crate) fn auto_refresh_enabled(app: &AppHandle) -> bool {
+    use tauri_plugin_zustand::ManagerExt;
+    app.zustand()
+        .get_or::<bool>("settings", "autoRefresh", true)
 }
 
 /// 托盘菜单与电量都走设备插件表，不在这里维护第二份 id / 名称。
@@ -41,7 +46,7 @@ fn resolve_stored_device_id(stored: String) -> String {
     }
 }
 
-fn read_stored_tray_device_id(app: &AppHandle) -> String {
+pub(crate) fn read_stored_tray_device_id(app: &AppHandle) -> String {
     use tauri_plugin_zustand::ManagerExt;
     let stored =
         app.zustand()
@@ -65,26 +70,22 @@ pub fn close_behavior(app: &AppHandle) -> String {
         .get_or::<String>("settings", "closeBehavior", "tray".into())
 }
 
-fn selected_tray_device(app: &AppHandle) -> String {
-    if let Some(state) = app.try_state::<TrayUiState>() {
-        if let Ok(id) = state.selected_id.lock() {
-            return id.clone();
-        }
-    }
-    read_stored_tray_device_id(app)
-}
-
-fn set_selected_tray_device(app: &AppHandle, id: &str) {
-    if let Some(state) = app.try_state::<TrayUiState>() {
-        if let Ok(mut guard) = state.selected_id.lock() {
-            *guard = id.to_string();
-        }
-    }
-    // 与前端 settings.trayDeviceId 同源，主窗口选设备 / 托盘菜单都能持久化
+/// 一次写入托盘设备和分类选中项，避免两次 patch 触发两次电量读取。
+fn commit_tray_device(app: &AppHandle, device_id: String, selected: SelectedByCategory) {
     use tauri_plugin_zustand::ManagerExt;
-    let _ = app
-        .zustand()
-        .patch("settings", [("trayDeviceId", id.to_string())]);
+    let id = resolve_stored_device_id(device_id);
+    let mut selected = sanitize_selection(&selected);
+    if let Some(plugin) = devices::find(&id) {
+        selected.set(plugin.meta().category, id.clone());
+    }
+    let selection = serde_json::to_value(&selected).unwrap_or(Value::Null);
+    let _ = app.zustand().patch(
+        "settings",
+        [
+            ("trayDeviceId", Value::String(id)),
+            ("selectedByCategory", selection),
+        ],
+    );
 }
 
 /// 每个分类至多一只。与前端 `SelectedByCategory` 同一份字段。
@@ -126,28 +127,15 @@ fn read_selected_by_category(app: &AppHandle) -> SelectedByCategory {
     )
 }
 
-fn save_selected_by_category(app: &AppHandle, selected: &SelectedByCategory) {
-    use tauri_plugin_zustand::ManagerExt;
-    if let Ok(value) = serde_json::to_value(selected) {
-        let _ = app.zustand().set("settings", "selectedByCategory", value);
-    }
-}
-
 /// 主窗口选中设备时调用：记下该分类的选中项，并让托盘图标跟着这只。
+/// 电量由 settings 监听触发的同一次采样更新，这里不再单独读 HID。
 #[tauri::command]
 pub fn set_tray_device(
     app: AppHandle,
     device_id: String,
     selected_by_category: SelectedByCategory,
 ) {
-    let id = resolve_stored_device_id(device_id);
-    let mut selected = sanitize_selection(&selected_by_category);
-    if let Some(plugin) = devices::find(&id) {
-        selected.set(plugin.meta().category, id.clone());
-    }
-    set_selected_tray_device(&app, &id);
-    save_selected_by_category(&app, &selected);
-    refresh_tray_battery(&app);
+    commit_tray_device(&app, device_id, selected_by_category);
 }
 
 /// 3×5 像素数字字模，用于托盘图标画电量。
@@ -362,6 +350,19 @@ fn matching_meta(id: &str, category: DeviceCategory) -> Option<DeviceMeta> {
     (meta.category == category).then_some(meta)
 }
 
+/// 丢掉对不上的 id。当前电量设备所在分类还空着时，用它补上。
+/// 和前端 `resolveSelectedByCategory` 同一条规则。
+fn resolve_selection(active_id: &str, selected: &SelectedByCategory) -> SelectedByCategory {
+    let mut clean = sanitize_selection(selected);
+    if let Some(plugin) = devices::find(active_id) {
+        let meta = plugin.meta();
+        if clean.get(meta.category).is_none() {
+            clean.set(meta.category, meta.id);
+        }
+    }
+    clean
+}
+
 fn sanitize_selection(selected: &SelectedByCategory) -> SelectedByCategory {
     const ORDER: [DeviceCategory; 3] = [
         DeviceCategory::Mouse,
@@ -402,13 +403,13 @@ fn tray_menu_entries(active_id: &str, selected: &SelectedByCategory) -> Vec<Tray
         DeviceCategory::Keyboard,
         DeviceCategory::Headset,
     ];
+    let selected = resolve_selection(active_id, selected);
     ORDER
         .into_iter()
         .map(|category| {
-            let chosen = selected
+            let meta = selected
                 .get(category)
                 .and_then(|id| matching_meta(id, category));
-            let meta = chosen.or_else(|| matching_meta(active_id, category));
             match meta {
                 Some(meta) => TrayMenuEntry {
                     id: Some(meta.id),
@@ -487,37 +488,134 @@ fn apply_tray_status(app: &AppHandle, info: &BatteryInfo, selected_id: &str) {
     }
 }
 
-fn refresh_tray_battery(app: &AppHandle) {
-    let id = selected_tray_device(app);
-    let info = devices::read_battery(&id);
+pub(crate) fn publish_battery(app: &AppHandle, device_id: &str, info: &BatteryInfo) {
     if !info.connected {
         app_log::warn(&format!(
-            "tray battery device={id} disconnected detail={}",
+            "tray battery device={device_id} disconnected detail={}",
             info.detail
         ));
     }
-    apply_tray_status(app, &info, &id);
+    apply_tray_status(app, info, device_id);
 }
 
-fn spawn_tray_updater(app: AppHandle) {
-    std::thread::spawn(move || {
-        // 启动稍等，让窗口 / store 先起来
-        std::thread::sleep(Duration::from_secs(2));
-        loop {
-            refresh_tray_battery(&app);
-            // Re-read settings each loop so Settings changes apply next sleep
-            let secs = auto_interval_sec(&app);
-            std::thread::sleep(Duration::from_secs(secs));
+pub(crate) fn refresh_tray_menu(app: &AppHandle) {
+    let id = read_stored_tray_device_id(app);
+    if let Some(tray) = app.tray_by_id("main") {
+        if let Ok(menu) = build_tray_menu(app, &id) {
+            let _ = tray.set_menu(Some(menu));
         }
-    });
+    }
+}
+
+#[derive(Clone)]
+struct SettingsSnap {
+    tray_id: String,
+    auto: bool,
+    interval: u64,
+    selected: SelectedByCategory,
+}
+
+impl Default for SettingsSnap {
+    fn default() -> Self {
+        Self {
+            tray_id: String::new(),
+            auto: true,
+            interval: DEFAULT_AUTO_INTERVAL_SEC,
+            selected: SelectedByCategory::default(),
+        }
+    }
+}
+
+struct SettingsWatch {
+    snap: Mutex<SettingsSnap>,
+}
+
+fn read_settings_snap(app: &AppHandle) -> SettingsSnap {
+    SettingsSnap {
+        tray_id: read_stored_tray_device_id(app),
+        auto: auto_refresh_enabled(app),
+        interval: auto_interval_sec(app),
+        selected: read_selected_by_category(app),
+    }
+}
+
+/// 对照上一份快照决定要不要读电量。
+/// 换设备才作废进行中的读取并立刻再采一次。只改分类选中项时重画菜单。
+/// 改间隔或暂停只打断睡眠；从暂停恢复才立刻读。
+fn on_settings_changed(app: &AppHandle) {
+    let Some(state) = app.try_state::<SettingsWatch>() else {
+        return;
+    };
+    // 在同一把锁里读 store 再换快照。两个回调不会拿着同一份旧值，各触发一次采样。
+    let (prev, next) = {
+        let mut snap = state.snap.lock().unwrap_or_else(|err| err.into_inner());
+        let prev = snap.clone();
+        let next = read_settings_snap(app);
+        *snap = next.clone();
+        (prev, next)
+    };
+    if next.tray_id != prev.tray_id {
+        battery::invalidate_device(app);
+        battery::request_refresh(app);
+        refresh_tray_menu(app);
+    } else if next.selected != prev.selected {
+        refresh_tray_menu(app);
+    }
+    if next.interval != prev.interval {
+        battery::poke(app);
+    }
+    if next.auto != prev.auto {
+        if next.auto {
+            battery::request_refresh(app);
+        } else {
+            battery::poke(app);
+        }
+    }
+}
+
+/// 等前端把 settings store 拉起来，再开始监听。这样启动采样用的是磁盘上的设备。
+pub(crate) fn install_settings_watch(app: &AppHandle) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while std::time::Instant::now() < deadline {
+        use tauri_plugin_zustand::ManagerExt;
+        if app
+            .zustand()
+            .get::<String>("settings", "trayDeviceId")
+            .is_ok()
+        {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    if let Some(state) = app.try_state::<SettingsWatch>() {
+        let mut snap = state.snap.lock().unwrap_or_else(|err| err.into_inner());
+        *snap = read_settings_snap(app);
+    }
+    for _ in 0..10 {
+        use tauri_plugin_zustand::ManagerExt;
+        match app.zustand().watch("settings", |app| {
+            on_settings_changed(&app);
+            Ok(())
+        }) {
+            Ok(_) => {
+                app_log::info("settings watch installed");
+                return;
+            }
+            Err(err) => {
+                app_log::warn(&format!("settings watch failed: {err}"));
+                thread::sleep(Duration::from_millis(200));
+            }
+        }
+    }
 }
 
 /// 创建托盘：图标/提示显示电量；单击弹出已选的鼠标、键盘、耳机；双击打开窗口。
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     app_log::info("setup_tray begin");
     let selected = read_stored_tray_device_id(app.handle());
-    app.manage(TrayUiState {
-        selected_id: Mutex::new(selected.clone()),
+    app.manage(battery::BatteryHub::new());
+    app.manage(SettingsWatch {
+        snap: Mutex::new(SettingsSnap::default()),
     });
 
     let menu = build_tray_menu(app.handle(), &selected)?;
@@ -532,8 +630,8 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
             if let Some(device_id) = id.strip_prefix("device:") {
-                set_selected_tray_device(app, device_id);
-                refresh_tray_battery(app);
+                let selected = read_selected_by_category(app);
+                commit_tray_device(app, device_id.to_string(), selected);
                 return;
             }
             match id {
@@ -554,7 +652,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         })
         .build(app)?;
 
-    spawn_tray_updater(app.handle().clone());
+    battery::spawn(app.handle().clone());
     app_log::info("setup_tray ok");
     Ok(())
 }
@@ -625,5 +723,16 @@ mod tests {
         assert_eq!(clean.mouse, None);
         assert_eq!(clean.keyboard, None);
         assert_eq!(clean.headset, None);
+    }
+
+    #[test]
+    fn explicit_mouse_selection_is_not_replaced_by_the_active_device() {
+        let selected = SelectedByCategory {
+            mouse: Some("razer-viper-ultimate".into()),
+            keyboard: None,
+            headset: None,
+        };
+        let entries = tray_menu_entries("vt9-air", &selected);
+        assert_eq!(ids(&entries), [Some("razer-viper-ultimate"), None, None]);
     }
 }

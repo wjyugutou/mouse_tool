@@ -53,16 +53,6 @@ pub fn list_devices() -> Vec<DeviceMeta> {
     list_meta()
 }
 
-/// 壳层命令：按设备 id 读电量。替换原先隐式只支持 VT9 的无参 `get_battery`。
-#[tauri::command]
-pub async fn get_battery(device_id: String) -> BatteryInfo {
-    let label = device_name(&device_id);
-    match tauri::async_runtime::spawn_blocking(move || read_battery(&device_id)).await {
-        Ok(info) => info,
-        Err(err) => BatteryInfo::disconnected(label, format!("读取任务失败: {err}")),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

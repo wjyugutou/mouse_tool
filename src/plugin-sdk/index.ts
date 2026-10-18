@@ -40,8 +40,11 @@ export function createDeviceAdapter(meta: {
         return false
       }
     },
-    readBattery() {
-      return invoke<BatteryInfo>('get_battery', { deviceId })
+    readBattery(options) {
+      return invoke<BatteryInfo>('get_battery', {
+        deviceId,
+        fresh: options?.fresh ?? false,
+      })
     },
   }
 }

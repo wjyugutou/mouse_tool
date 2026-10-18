@@ -72,7 +72,7 @@ export function SettingsPage() {
 
   return (
     <div className="bg-background flex min-h-0 flex-1">
-      <aside className="bg-card/40 w-[168px] shrink-0 overflow-auto border-r border-border p-3">
+      <aside className="bg-card/40 w-42 shrink-0 overflow-auto border-r border-border p-3">
         {visibleSections.map(s => (
           <button
             key={s.id}
@@ -154,6 +154,13 @@ export function SettingsPage() {
                 }
                 reset()
                 applyThemeFromStore()
+                const next = useSettingsStore.getState()
+                void invoke('set_tray_device', {
+                  deviceId: next.trayDeviceId,
+                  selectedByCategory: next.selectedByCategory,
+                }).catch((e: unknown) => {
+                  console.error('set_tray_device failed', e)
+                })
               })()
             }}
           >

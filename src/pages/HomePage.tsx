@@ -1,6 +1,7 @@
-/** 首页：左侧设备侧栏，右侧电量 hero 卡，按设置间隔自动刷新。 */
+/** 首页：左侧设备侧栏，右侧电量 hero 卡。电量来自后端同一次采样，不自己再读 HID。 */
 import type { BatteryInfo } from '@/devices'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BatteryCard } from '@/components/BatteryCard'
 import { DeviceList } from '@/components/DeviceList'
@@ -10,80 +11,112 @@ import {
 } from '@/devices'
 import { resolveSelectedByCategory, useSettingsStore } from '@/stores/settings'
 
+interface BatteryUpdate extends BatteryInfo {
+  deviceId: string
+}
+
+interface Sample {
+  deviceId: string
+  info: BatteryInfo
+  at: Date
+}
+
 export function HomePage() {
   const autoIntervalSec = useSettingsStore(s => s.autoIntervalSec)
+  const autoRefresh = useSettingsStore(s => s.autoRefresh)
   const trayDeviceId = useSettingsStore(s => s.trayDeviceId)
   const storedSelection = useSettingsStore(s => s.selectedByCategory)
   const setTrayDeviceId = useSettingsStore(s => s.setTrayDeviceId)
-  const selectedByCategory = useMemo(
-    () => resolveSelectedByCategory(trayDeviceId, storedSelection),
-    [trayDeviceId, storedSelection],
-  )
-  const [info, setInfo] = useState<BatteryInfo | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [auto, setAuto] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  // 防止并发刷新；token 用于丢弃过期响应
-  const inflightRef = useRef(false)
-  const ignoreTokenRef = useRef(0)
-
+  const setAutoRefresh = useSettingsStore(s => s.setAutoRefresh)
   const selected = useMemo(
     () => getDeviceById(trayDeviceId) ?? deviceRegistry[0],
     [trayDeviceId],
   )
+  const selectedByCategory = useMemo(
+    () => resolveSelectedByCategory(selected?.id ?? '', storedSelection),
+    [selected, storedSelection],
+  )
+  const [sample, setSample] = useState<Sample | null>(null)
+  const [error, setError] = useState<{ deviceId: string, message: string } | null>(null)
+  const [refreshingId, setRefreshingId] = useState<string | null>(null)
+  // 样本带着读它时的设备 id。换设备后对不上就先空白，避免上一只的电量留在卡片上。
+  const matching = sample?.deviceId === selected?.id ? sample : null
+  const visibleError = error?.deviceId === selected?.id ? error.message : null
+  const loading = refreshingId === selected?.id || (matching == null && visibleError == null)
+
+  const applySample = useCallback((deviceId: string, info: BatteryInfo) => {
+    setSample({ deviceId, info, at: new Date() })
+    setError(current => current?.deviceId === deviceId ? null : current)
+  }, [])
+  // 渲染时更新。点击换设备会先改 store 再重渲染，事件回来时这里已经是新 id。
+  // 监听不跟着设备重订，否则退订到重订的空隙里事件会丢，卡片就要空等到下一轮间隔。
+  const selectedIdRef = useRef(selected?.id)
+  selectedIdRef.current = selected?.id
+
+  useEffect(() => {
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+    void listen<BatteryUpdate>('battery-updated', (event) => {
+      if (cancelled || event.payload.deviceId !== selectedIdRef.current)
+        return
+      const { deviceId, ...info } = event.payload
+      applySample(deviceId, info)
+    }).then((stop) => {
+      if (cancelled)
+        stop()
+      else
+        unlisten = stop
+    })
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [applySample])
+
+  // 只在进页面时要一次当前采样。有缓存就不再读 HID。
+  // 换设备不在这里读，否则会和托盘那次采样各开一条 HID。
+  useEffect(() => {
+    const deviceId = selectedIdRef.current
+    const device = deviceId ? (getDeviceById(deviceId) ?? deviceRegistry[0]) : undefined
+    if (!device)
+      return
+    let cancelled = false
+    void device.readBattery().then((info) => {
+      if (!cancelled && selectedIdRef.current === device.id)
+        applySample(device.id, info)
+    }).catch((e: unknown) => {
+      if (!cancelled && selectedIdRef.current === device.id)
+        setError({ deviceId: device.id, message: String(e) })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [applySample])
 
   const refresh = useCallback(async () => {
-    if (!selected || inflightRef.current)
+    if (!selected)
       return
-    inflightRef.current = true
-    const token = ++ignoreTokenRef.current
-    setLoading(true)
-    setError(null)
+    const deviceId = selected.id
+    setRefreshingId(deviceId)
+    setError(current => current?.deviceId === deviceId ? null : current)
     try {
-      const next = await selected.readBattery()
-      if (token !== ignoreTokenRef.current)
+      const info = await selected.readBattery({ fresh: true })
+      // 读取期间如果已经换成另一只，丢掉这次结果。新设备的电量由 battery-updated 送来。
+      if (useSettingsStore.getState().trayDeviceId !== trayDeviceId)
         return
-      setInfo(next)
-      setLastUpdated(new Date())
+      if ((getDeviceById(useSettingsStore.getState().trayDeviceId) ?? deviceRegistry[0])?.id !== deviceId)
+        return
+      applySample(deviceId, info)
     }
     catch (e) {
-      if (token !== ignoreTokenRef.current)
+      if ((getDeviceById(useSettingsStore.getState().trayDeviceId) ?? deviceRegistry[0])?.id !== deviceId)
         return
-      setInfo(null)
-      setError(String(e))
-      setLastUpdated(new Date())
+      setError({ deviceId, message: String(e) })
     }
     finally {
-      if (token === ignoreTokenRef.current) {
-        setLoading(false)
-        inflightRef.current = false
-      }
+      setRefreshingId(current => current === deviceId ? null : current)
     }
-  }, [selected])
-
-  // 自动刷新：间隔来自设置 store
-  useEffect(() => {
-    if (!auto || !selected)
-      return
-    void refresh()
-    const id = window.setInterval(() => {
-      void refresh()
-    }, autoIntervalSec * 1000)
-    return () => window.clearInterval(id)
-  }, [auto, selected, refresh, autoIntervalSec])
-
-  const stopRefresh = useCallback(() => {
-    setAuto(false)
-    ignoreTokenRef.current += 1
-    inflightRef.current = false
-    setLoading(false)
-  }, [])
-
-  const startRefresh = useCallback(() => {
-    setAuto(true)
-    void refresh()
-  }, [refresh])
+  }, [applySample, selected, trayDeviceId])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -93,36 +126,35 @@ export function HomePage() {
         selectedByCategory={selectedByCategory}
         onSelect={(id) => {
           setTrayDeviceId(id)
+          setAutoRefresh(true)
           const next = useSettingsStore.getState().selectedByCategory
           void invoke('set_tray_device', {
             deviceId: id,
             selectedByCategory: next,
-          }).catch(() => {})
-          setInfo(null)
-          setError(null)
-          setLastUpdated(null)
-          setAuto(true)
+          }).catch((e: unknown) => {
+            console.error('set_tray_device failed', e)
+          })
         }}
-        auto={auto}
+        auto={autoRefresh}
         autoIntervalSec={autoIntervalSec}
       />
 
       <main className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="bg-primary/10 pointer-events-none absolute -top-40 right-[-12%] size-[520px] rounded-full blur-[120px]" />
-        <div className="relative mx-auto flex min-h-full w-full max-w-[860px] flex-col justify-start px-5 py-6 lg:justify-center lg:px-10 lg:py-8">
+        <div className="bg-primary/10 pointer-events-none absolute -top-40 right-[-12%] size-130 rounded-full blur-[120px]" />
+        <div className="relative mx-auto flex min-h-full w-full max-w-215 flex-col justify-start px-5 py-6 lg:justify-center lg:px-10 lg:py-8">
           {selected
             ? (
                 <BatteryCard
                   deviceName={selected.name}
-                  info={info}
+                  info={matching?.info ?? null}
                   loading={loading}
-                  auto={auto}
+                  auto={autoRefresh}
                   autoIntervalSec={autoIntervalSec}
-                  error={error}
-                  lastUpdated={lastUpdated}
+                  error={visibleError}
+                  lastUpdated={matching?.at ?? null}
                   onRefresh={refresh}
-                  onStartRefresh={startRefresh}
-                  onStopRefresh={stopRefresh}
+                  onStartRefresh={() => setAutoRefresh(true)}
+                  onStopRefresh={() => setAutoRefresh(false)}
                 />
               )
             : (
