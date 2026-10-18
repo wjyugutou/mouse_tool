@@ -51,10 +51,20 @@ use std::time::Duration;
 /// IPI / PIAO 厂商号。
 const VENDOR_ID: u16 = 0x372E;
 
-/// 已确认走同一套 `ms_pix_v1` 协议的 PID（IPI 系，含本机接收器实测的 `0x103D`）。
+/// 本插件认的 PID —— **只收前行者 EWEADN S9 系列**。
 ///
-/// 注意：**VID+PID 认不出是 Pro 还是 Ultra/Max**。官方驱动
-/// `D:\EWEADN S9\config.xml` 里三个型号共用同一批 2.4G 接收器 PID：
+/// ## 为什么不能顺便收 IPI 自家机型
+///
+/// `0x372E` 是 IPI/PIAO 的厂商号，同厂商还有 IPI Float 88、PIAO 等机型
+/// （PID `0x1014` / `0x1015` / `0x1028` / `0x1056`），协议同样是 `ms_pix_v1`。
+/// 早期版本把这些也列了进来，后果是：插一只 **IPI Float 88** 会被这个
+/// 「前行者 S9 Pro」插件认领，电量能读出来，但**设备名是错的**，
+/// 详情里还会写出错误的「由 Pro/Ultra/Max 共用」说明。
+///
+/// 插件名承诺只支持 S9 Pro，就不该顺手支持别人的鼠标。要支持 IPI Float 88
+/// 请另开一个插件（`ipi-float-88`），各自的 manifest 名字才诚实。
+///
+/// ## 型号与 PID 对照（来源：官方驱动 `D:\EWEADN S9\config.xml`）
 ///
 /// | 型号 | 有线 PID | 2.4G 接收器 PID |
 /// | --- | --- | --- |
@@ -65,12 +75,8 @@ const VENDOR_ID: u16 = 0x372E;
 /// 所以：有线 PID 能唯一认出型号，2.4G 接收器 PID 认不出。
 /// 本版只保证 S9 Pro；遇到能确认是 Ultra/Max 的有线 PID 时，明确拒绝说成 Pro。
 const PRODUCT_IDS: &[u16] = &[
-    0x1014, // IPI Float 88 无线接收器
-    0x1015, // IPI Float 88 有线
-    0x1028, // 同族有线
-    0x1056, // 同族有线
     0x1029, // S9 Pro 有线
-    // S9 Ultra / Max 的有线 PID 也列进来，才能「认出来并明确拒绝」，
+    // Ultra / Max 的有线 PID 也列进来，才能「认出来并明确拒绝」，
     // 而不是枚举阶段就漏掉、被当成设备没插。
     0x1027, // S9 Ultra 有线
     0x105E, // S9 Max 有线
@@ -85,7 +91,7 @@ const PRODUCT_IDS: &[u16] = &[
 /// `0x1027` = S9 Ultra 有线，`0x105E` = S9 Max 有线（见 `config.xml`）。
 const OTHER_MODEL_WIRED_PIDS: &[u16] = &[0x1027, 0x105E];
 
-/// 这三个 2.4G PID 是 Pro/Ultra/Max 共用的，命中时型号不可判定。
+/// 这几个 2.4G PID 是 Pro/Ultra/Max 共用的，命中时型号不可判定。
 const SHARED_RECEIVER_PIDS: &[u16] = &[0x1026, 0x1033, 0x103D, 0x1055];
 
 /// S9 Pro 的有线 PID，命中即可确认型号。
@@ -207,6 +213,8 @@ enum ModelGuess {
     SharedReceiver,
     /// 有线 PID 明确是 Ultra / Max，不是 Pro。
     OtherModel(u16),
+    /// 不是 S9 系列的已知 PID（例如 IPI 自家机型）。本插件不该认领。
+    NotS9Series(u16),
 }
 
 /// 按 PID 判型号。判定依据见 [`PRODUCT_IDS`] 的注释表格。
@@ -221,9 +229,9 @@ fn guess_model(pid: u16) -> ModelGuess {
         ModelGuess::SharedReceiver
     }
     else {
-        // 同族的 IPI PID（0x1014/0x1015/0x1028/0x1056）严格说也不等于 Pro，
-        // 但它们不是 S9 系列的已知型号，按共用处理最保守。
-        ModelGuess::SharedReceiver
+        // 不是 S9 系列。正常情况下枚举阶段就用 PRODUCT_IDS 过滤掉了，
+        // 这里是兜底：万一将来 PRODUCT_IDS 被误加，也不会被当成 S9 蒙混过去。
+        ModelGuess::NotS9Series(pid)
     }
 }
 
@@ -285,6 +293,16 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
     };
 
     let model = guess_model(pid);
+
+    // 不是 S9 系列（例如 IPI 自家机型）：本插件不该认领，也不能拿它的电量。
+    if let ModelGuess::NotS9Series(other_pid) = model {
+        return Ok(BatteryInfo::disconnected(
+            device_label,
+            format!(
+                "发现 VID {VENDOR_ID:04X} 的 PID 0x{other_pid:04X}，但不属于前行者 S9 系列，本插件不认领。"
+            ),
+        ));
+    }
 
     // 有线 PID 明确是 Ultra/Max：不能把别人的鼠标标成 S9 Pro。
     if let ModelGuess::OtherModel(other_pid) = model {
@@ -527,14 +545,44 @@ mod tests {
         assert_eq!(guess_model(0x105E), ModelGuess::OtherModel(0x105E)); // Max
     }
 
-    /// 所有可识别的 PID 都要在 PRODUCT_IDS 里，否则根本枚举不到。
+    /// 所有 S9 系列可识别的 PID 都要在 PRODUCT_IDS 里，否则根本枚举不到
+    /// （Ultra/Max 会被误报成「设备没插」，而不是「认出来了但不支持」）。
     #[test]
-    fn every_known_pid_is_enumerable() {
+    fn every_s9_pid_is_enumerable() {
         for pid in [0x1029u16, 0x1027, 0x105E, 0x1026, 0x1033, 0x103D, 0x1055] {
             assert!(
                 PRODUCT_IDS.contains(&pid),
                 "PID 0x{pid:04X} 在 guess_model 里有含义，但不在 PRODUCT_IDS，枚举阶段就会被漏掉"
             );
         }
+    }
+
+    /// **回归测试**：不能顺手认领 IPI 自家的其它机型。
+    ///
+    /// `0x372E` 是 IPI/PIAO 的厂商号，同厂还有 IPI Float 88 / PIAO
+    /// （PID `0x1014` / `0x1015` / `0x1028` / `0x1056`），协议同样是 `ms_pix_v1`。
+    /// 早期版本把这些列进了 PRODUCT_IDS，结果插一只 IPI Float 88 会被
+    /// 「前行者 S9 Pro」插件认领、显示错误设备名，详情里还会写出错误的型号说明。
+    /// 插件名只承诺 S9 Pro，就不该顺手支持别人的鼠标。
+    #[test]
+    fn does_not_claim_other_ipi_models() {
+        for pid in [0x1014u16, 0x1015, 0x1028, 0x1056] {
+            assert!(
+                !PRODUCT_IDS.contains(&pid),
+                "PID 0x{pid:04X} 是 IPI 自家机型，不该被「前行者 S9 Pro」插件认领"
+            );
+            assert_eq!(
+                guess_model(pid),
+                ModelGuess::NotS9Series(pid),
+                "PID 0x{pid:04X} 不是 S9 系列，必须判成 NotS9Series"
+            );
+        }
+    }
+
+    /// 本机实测的 `0x103D` 必须是 S9 系列（否则插着也读不到）。
+    #[test]
+    fn measured_receiver_pid_is_recognised() {
+        assert!(PRODUCT_IDS.contains(&0x103D));
+        assert_eq!(guess_model(0x103D), ModelGuess::SharedReceiver);
     }
 }
