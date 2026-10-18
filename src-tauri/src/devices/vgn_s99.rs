@@ -48,7 +48,7 @@
 //! - 只发 `0x1A` 这一条**只读查询**命令，绝不发任何 `SET_*` 写配置命令
 //! - 最多重试有限次，不循环轰炸
 //! - `get_input_report` 对任何设备都不许用（项目硬规则）
-//! - SM99 这只设备「不主动推送」，只能主机问一次、设备答一次
+//! - S99 这只设备「不主动推送」，只能主机问一次、设备答一次
 
 use crate::plugin_sdk::{parse_manifest, BatteryInfo, DevicePlugin};
 use hidapi::{HidApi, HidDevice};
@@ -61,6 +61,8 @@ const VGN_VID: u16 = 0x320F;
 const RECEIVER_PID: u16 = 0x5088;
 /// 厂商自定义接口（`MI_01&Col04`）。注意不是 Col01（那是标准键盘）。
 const VENDOR_USAGE_PAGE: u16 = 0xFF1C;
+/// Col04 的 usage。同一页上若还有别的集合，优先开这一只。
+const VENDOR_USAGE: u16 = 0x0092;
 
 /// 厂商接口的 Report ID，描述符里 `85 04`。
 const REPORT_ID: u8 = 0x04;
@@ -168,8 +170,15 @@ fn read_vgn_s99_battery() -> Result<BatteryInfo, String> {
         ));
         // 必须开厂商自定义接口；开标准键盘接口（page 0x0001）一定读不到，
         // 而且那个接口被 Windows 独占，打开就会「拒绝访问」。
+        // 同一页可能有多个集合，电量在 usage 0x0092；已经选中它就不要被后面的集合盖掉。
         if page == VENDOR_USAGE_PAGE {
-            candidate = Some((pid, page, usage, iface, device.path().to_owned(), product));
+            let already_preferred = matches!(
+                candidate,
+                Some((_, _, current, _, _, _)) if current == VENDOR_USAGE
+            );
+            if !already_preferred {
+                candidate = Some((pid, page, usage, iface, device.path().to_owned(), product));
+            }
         }
     }
 
@@ -280,10 +289,7 @@ fn read_battery_once(device: &HidDevice) -> Result<(u8, bool), ReadError> {
 }
 
 /// 在超时内等一条电量回包。期间收到的其它报文（如命令回显）跳过。
-fn wait_for_battery_reply(
-    device: &HidDevice,
-    timeout: Duration,
-) -> Result<(u8, bool), String> {
+fn wait_for_battery_reply(device: &HidDevice, timeout: Duration) -> Result<(u8, bool), String> {
     let deadline = Instant::now() + timeout;
     let mut saw_other = None;
 
@@ -402,11 +408,12 @@ mod tests {
 
     #[test]
     fn rejects_wrong_command_code() {
-        // 回显包：命令码位置是 0x87（旧文档那个错误命令）而不是 0x1A
-        let mut resp = vec![0x04u8, 0x87, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00];
+        // 带 Report ID 时命令码在下标 3。这里放旧文档那个错误命令 0x87。
+        let mut resp = vec![0x04u8, 0x00, 0x00, 0x87, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00];
         resp.resize(66, 0);
         let err = parse_battery_reply(&resp).unwrap_err();
         assert!(err.contains("不是电量回包"), "实际错误: {err}");
+        assert!(err.contains("0x87"), "实际错误: {err}");
     }
 
     #[test]

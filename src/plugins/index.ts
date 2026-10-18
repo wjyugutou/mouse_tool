@@ -1,4 +1,4 @@
-/** 已安装的前端设备插件。新增鼠标时在 `deviceRegistry` 追加一行。 */
+/** 已安装的前端设备插件。新增设备时在 `deviceRegistry` 追加一行。 */
 import type { DeviceAdapter } from '@/plugin-sdk'
 import { mchoseA5V3UltraPlus } from './mchose-a5-v3-ultra-plus'
 import { razerViperUltimate } from './razer-viper-ultimate'

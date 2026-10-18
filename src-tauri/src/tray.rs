@@ -732,31 +732,39 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 mod tests {
     use super::*;
 
-    fn ids(entries: &[TrayMenuEntry]) -> Vec<Option<&str>> {
-        entries.iter().map(|entry| entry.id.as_deref()).collect()
-    }
-
     #[test]
     fn menu_lists_every_device_and_keeps_empty_categories() {
         let entries = tray_menu_entries();
-        // 菜单列出 PLUGINS 里的每一只设备，之后补齐还没设备的分类。
-        // 不写死设备清单，避免以后新增设备时这条测试因为「多了一行」而红。
         let registered = devices::list_meta();
-        assert_eq!(
-            entries.len(),
-            registered.len() + 1,
-            "设备数 + 1 个空分类（耳机）"
-        );
-
-        for (entry, meta) in entries.iter().zip(registered.iter()) {
-            assert_eq!(entry.id.as_deref(), Some(meta.id.as_str()));
-            assert_eq!(entry.category, meta.category);
+        // 菜单按分类列出 PLUGINS 里的每一只；空分类只留一行。
+        // 不假设「永远多一个耳机空行」，也不假设注册顺序等于菜单顺序。
+        const ORDER: [DeviceCategory; 3] = [
+            DeviceCategory::Mouse,
+            DeviceCategory::Keyboard,
+            DeviceCategory::Headset,
+        ];
+        let mut cursor = 0;
+        for category in ORDER {
+            let expected: Vec<_> = registered
+                .iter()
+                .filter(|meta| meta.category == category)
+                .collect();
+            if expected.is_empty() {
+                let entry = &entries[cursor];
+                assert_eq!(entry.id, None, "{category:?} 应是空行");
+                assert_eq!(entry.category, category);
+                cursor += 1;
+            } else {
+                for meta in expected {
+                    let entry = &entries[cursor];
+                    assert_eq!(entry.id.as_deref(), Some(meta.id.as_str()));
+                    assert_eq!(entry.name.as_deref(), Some(meta.name.as_str()));
+                    assert_eq!(entry.category, category);
+                    cursor += 1;
+                }
+            }
         }
-
-        // 最后一行是还没设备的分类；当前是耳机（前三只鼠标 + VGN 键盘已占位）。
-        let tail = entries.last().expect("至少有一行");
-        assert_eq!(tail.id, None, "末尾应是空分类");
-        assert_eq!(tail.category, DeviceCategory::Headset);
+        assert_eq!(cursor, entries.len());
 
         assert_eq!(entries[0].category, DeviceCategory::Mouse);
         assert_eq!(

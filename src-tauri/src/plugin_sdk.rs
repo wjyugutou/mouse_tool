@@ -1,6 +1,6 @@
 //! 设备插件契约（构建期，不是动态库）。
 //!
-//! 每只鼠标提供一份与前端共用的 `manifest.json`，外加一个只做中断读的电量函数。
+//! 每只设备提供一份与前端共用的 `manifest.json`，外加一个电量函数。
 //! 壳层用 `get_battery(device_id)` 按 id 分发；设置、更新、日志不属于插件。
 
 use serde::{Deserialize, Serialize};
