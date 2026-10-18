@@ -1,12 +1,12 @@
 # 设备插件开发
 
-给要加一只鼠标的人看。代理用的短清单在 `.cursor/skills/develop/SKILL.md`，规则以那边和本文一致为准。
+给要加一只设备的人看。代理用的短清单在 `.cursor/skills/develop/SKILL.md`，规则以那边和本文一致为准。
 
 ## 插件是什么
 
-这里的插件是**构建期的一只鼠标**，不是可以下载安装的插件市场。
+这里的插件是**构建期的一只设备**（鼠标、键盘或耳机），不是可以下载安装的插件市场。
 
-一只鼠标 = 一份前端适配器 + 一份 Rust HID 读取。两者在编译时写进程序。没有 DLL 热加载，也不扫描用户目录。
+一只设备 = 一份前端适配器 + 一份 Rust HID 读取。两者在编译时写进程序。没有 DLL 热加载，也不扫描用户目录。
 
 窗口、设置、托盘壳、日志、更新留在壳层，不要做成插件。托盘只负责图标和菜单，设备名单从插件表来。菜单按鼠标、键盘、耳机分组，列出该分类里的每一只；该分类没有设备时显示「未选择」。悬停提示同样列出每一只。图标数字仍跟着当前选中的那一只。
 
@@ -27,20 +27,36 @@
 
 电量只有一条壳层命令：`get_battery(device_id)`。前端是 `invoke('get_battery', { deviceId })`，`createDeviceAdapter` 已经这么调。不要再加无参、隐含只支持 VT9 的 `get_battery`。`list_devices` 返回 Rust 侧已注册的设备，用来对照 id。
 
-现有三只：
+现有四只：
 
 - `vt9-air`：中断读，模板是 `src/plugins/vt9-air/` 与 `src-tauri/src/devices/vt9_air.rs`
 - `razer-viper-ultimate`：Feature 报告，模板是 `src/plugins/razer-viper-ultimate/` 与 `src-tauri/src/devices/razer_viper_ultimate.rs`
 - `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `src/plugins/mchose-a5-v3-ultra-plus/` 与 `src-tauri/src/devices/mchose_a5_v3_ultra.rs`
+- `vgn-s99`：**首只 `category: keyboard`**。接收器 `320F:5088` 的 `0xFF1C` 厂商接口走 Output 报文 + Input 中断读回（Report ID `0x04`，命令 `0x1A`），模板是 `src/plugins/vgn-s99/` 与 `src-tauri/src/devices/vgn_s99.rs`。它证明了一件事：**不是每只设备都能用 Feature 报告**。该接口描述符只有 `81 00`（Input）/ `91 00`（Output）、没有 `B1` 项，所以 `HidD_SetFeature` 恒返回 `0x1`
 
-## 加一只鼠标
+## 加一只设备（鼠标 / 键盘 / 耳机）
 
 1. 复制一份前端目录。普通鼠标复制 `src/plugins/vt9-air/`。已经确认必须用 Feature 报告、并且会在 Rust 文件顶部写明 opt-in 的，复制 `src/plugins/razer-viper-ultimate/`。
-2. 只改新目录里的 `manifest.json`（`id` 用稳定的短横线，例如 `razer-viper-ultimate`）。`index.ts` 保持 `createDeviceAdapter(manifest)`，把注释里的 Rust 路径改成新文件。
+2. 只改新目录里的 `manifest.json`（`id` 用稳定的短横线，例如 `razer-viper-ultimate`；`category` 按设备类型填 `mouse` / `keyboard` / `headset`）。`index.ts` 保持 `createDeviceAdapter(manifest)`，把注释里的 Rust 路径改成新文件。
 3. 在 `src/plugins/index.ts` 的 `deviceRegistry` 加一行 import。不要为了注册去改 `HomePage`。
 4. 在 `src-tauri/src/devices/` 加模块，文件名用下划线。`manifest_json` 用 `include_str!` 指向第 2 步那个 `manifest.json`。
 5. 在 `src-tauri/src/devices/mod.rs` 声明 `mod`，并在 `PLUGINS` 加一行。顺序与 `deviceRegistry` 相同。
 6. 命令不用新注册。`get_battery` 已经在 `generate_handler!` 里，按 `device_id` 分发。
+7. 注意 `devices/mod.rs` 的单元测试断言了 `PLUGINS` 前几项的顺序和分类。**新增设备后这条测试会红，必须同步改**，否则 `cargo test --lib` 过不了。
+
+### HID 通道的三种形态（选错会白干）
+
+加新设备时，先确认它用哪种通道，**不要默认套用某一只的写法**：
+
+| 形态 | 特征 | 例子 |
+| --- | --- | --- |
+| 被动中断读 | 设备自己周期性推报告 | 雷柏 VT9 AIR（Report `0xBB`） |
+| Feature 报告 | 描述符里**有 `B1` 项** | 雷蛇毒蝰（OpenRazer 协议） |
+| Output 报文 + Input 读回 | 描述符里是 `81 00` + `91 00`，**没有 `B1`** | 迈从 A5 V3（`0x4D` 邮箱）、VGN S99（`0x1A` 邮箱） |
+
+**判据**：读设备报告描述符，看有没有 `B1`（Feature）项。没有 `B1` 却调用 `send_feature_report`，Windows 会返回 `0x1`（函数不正确），很容易误以为是设备被占用或命令写错。VGN S99 就踩过这个坑。
+
+**另一个坑**：从厂商 Electron 驱动逆向协议时，同一份驱动里往往有**多个设备类**（按 `customDeviceType` / `productName` 分派）。必须定位到目标机型对应的那一个类，抓到第一个同名函数（如 `getBattery`）就当结论会出错。VGN S99 的协议在 `WsServe` 类里，而驱动里还有另外几个类也定义了 `getBattery`，用的是完全不同的命令。
 
 ## HID 怎么读
 
@@ -75,3 +91,4 @@ cargo test --lib
 - 毒蝰终极版：先关掉 Razer Synapse（它可能独占 HID），插上接收器或用线连接，选「毒蝰终极版 Viper Ultimate」。应出现百分比；说明里会有 `raw n/255`。拔掉后再刷新，应提示未找到设备。
 - 迈从 A5 V3 Ultra+：接收器 `3837:1018` 插在 MagDock 上也可以；选中后应出现百分比，说明里会写 `接收器邮箱 0x4D/0x0900`。M HUB 开着时如果读不到，先关掉再试。
 - 两只都接上时，来回切换，确认 VT9 仍是中断读、毒蝰仍是 Feature 读。
+- VGN S99：先**完全退出 VGN VHUB**（它会独占 `0xFF1C` 接口），选中「VGN S99」后应出现百分比，说明里会写 `厂商邮箱 Output 0x04/0x1A`。充电时插线应显示「充电中」。读不到时先确认键盘已开机并与接收器配对。
