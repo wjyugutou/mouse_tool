@@ -219,7 +219,7 @@ function AppearancePanel({
     <div className="space-y-6">
       <h2 className="text-lg font-semibold">外观</h2>
       <div className="flex flex-col flex-wrap gap-5">
-        <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+        <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
           <span className="text-muted-foreground text-xs">主题</span>
           <div className="bg-card inline-flex overflow-hidden rounded-lg border border-border">
             {(
@@ -247,7 +247,7 @@ function AppearancePanel({
           </div>
         </div>
 
-        <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+        <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
           <span className="text-muted-foreground text-xs">自动刷新间隔（秒）</span>
           <Input
             type="number"
@@ -268,7 +268,7 @@ function AppearancePanel({
           </p>
         </div>
 
-        <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+        <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
           <span className="text-muted-foreground text-xs">关闭窗口时</span>
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <Checkbox
@@ -288,7 +288,7 @@ function AppearancePanel({
             import.meta.env.DEV
               ? null
               : (
-                  <div className="flex w-fit min-w-[240px] flex-1 flex-col gap-2">
+                  <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
                     <span className="text-muted-foreground text-xs">开机自启</span>
                     <label className="flex cursor-pointer items-center gap-2 text-sm">
                       <Checkbox
