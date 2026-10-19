@@ -391,11 +391,6 @@ pub(crate) fn should_publish(flight_generation: u64, now_generation: u64) -> boo
     flight_generation == now_generation
 }
 
-/// 托盘图标上的数字只画当前选中的那一只。
-pub(crate) fn icon_follows(device_id: &str, tray_id: &str) -> bool {
-    device_id == tray_id
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,8 +399,6 @@ mod tests {
     fn stale_read_is_not_published() {
         assert!(should_publish(1, 1));
         assert!(!should_publish(1, 2));
-        assert!(icon_follows("vt9-air", "vt9-air"));
-        assert!(!icon_follows("vt9-air", "razer-viper-ultimate"));
     }
 
     #[test]
