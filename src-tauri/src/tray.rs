@@ -790,7 +790,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
     let samples = HashMap::new();
     let menu = build_tray_menu(app.handle(), &selected, &samples)?;
-let icon = make_battery_icon(IconMode::Level(None));
+    let icon = make_battery_icon(IconMode::Level(None));
     let selected_by_category = read_selected_by_category(app.handle());
     let tip = tooltip_text(&selected, &selected_by_category, &samples);
 
