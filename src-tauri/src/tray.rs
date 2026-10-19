@@ -433,19 +433,34 @@ fn battery_status(info: Option<&BatteryInfo>) -> String {
     }
 }
 
-/// 悬停提示列出每一只。打勾的是图标数字跟着的那一只。
-pub(crate) fn tooltip_text(active_id: &str, samples: &HashMap<String, BatteryInfo>) -> String {
-    let lines: Vec<String> = devices::list_meta()
-        .into_iter()
-        .map(|meta| {
-            let status = battery_status(samples.get(&meta.id));
-            if meta.id == active_id {
-                format!("✓ {} · {status}", meta.name)
-            } else {
-                format!("{} · {status}", meta.name)
-            }
-        })
-        .collect();
+/// 悬停提示只列出「当前选择」的鼠标 / 键盘 / 耳机（最多三行）。
+/// 未选的分类不出现；打勾的是托盘图标数字跟着的那一只。
+pub(crate) fn tooltip_text(
+    active_id: &str,
+    selected: &SelectedByCategory,
+    samples: &HashMap<String, BatteryInfo>,
+) -> String {
+    const ORDER: [DeviceCategory; 3] = [
+        DeviceCategory::Mouse,
+        DeviceCategory::Keyboard,
+        DeviceCategory::Headset,
+    ];
+    let resolved = resolve_selection(active_id, selected);
+    let mut lines = Vec::new();
+    for category in ORDER {
+        let Some(id) = resolved.get(category) else {
+            continue;
+        };
+        let Some(meta) = matching_meta(id, category) else {
+            continue;
+        };
+        let status = battery_status(samples.get(&meta.id));
+        if meta.id == active_id {
+            lines.push(format!("✓ {} · {status}", meta.name));
+        } else {
+            lines.push(format!("{} · {status}", meta.name));
+        }
+    }
     if lines.is_empty() {
         "yugutou_tool".into()
     } else {
@@ -540,7 +555,8 @@ fn sample_snapshot(app: &AppHandle) -> HashMap<String, BatteryInfo> {
 fn redraw_tray(app: &AppHandle) {
     let samples = sample_snapshot(app);
     let active = read_stored_tray_device_id(app);
-    let tip = tooltip_text(&active, &samples);
+    let selected = read_selected_by_category(app);
+    let tip = tooltip_text(&active, &selected, &samples);
     let Some(tray) = app.tray_by_id("main") else {
         return;
     };
@@ -675,7 +691,7 @@ pub(crate) fn install_settings_watch(app: &AppHandle) {
     }
 }
 
-/// 创建托盘：图标显示当前设备电量，提示和菜单列出每一只；双击打开窗口。
+/// 创建托盘：图标显示当前设备电量；悬停提示只列已选鼠标/键盘/耳机；菜单仍可列全部。双击打开窗口。
 pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     app_log::info("setup_tray begin");
     let selected = read_stored_tray_device_id(app.handle());
@@ -690,7 +706,8 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let samples = HashMap::new();
     let menu = build_tray_menu(app.handle(), &selected, &samples)?;
     let icon = make_battery_icon(None);
-    let tip = tooltip_text(&selected, &samples);
+    let selected_by_category = read_selected_by_category(app.handle());
+    let tip = tooltip_text(&selected, &selected_by_category, &samples);
 
     TrayIconBuilder::with_id("main")
         .icon(icon)
@@ -801,7 +818,7 @@ mod tests {
     }
 
     #[test]
-    fn tooltip_lists_every_device_and_marks_the_icon_device() {
+    fn tooltip_lists_only_selected_slots_and_marks_the_icon_device() {
         let mut samples = HashMap::new();
         samples.insert(
             "mchose-a5-v3-ultra-plus".into(),
@@ -815,26 +832,32 @@ mod tests {
         );
         samples.insert(
             "razer-viper-ultimate".into(),
-            BatteryInfo::disconnected("毒蝰终极版 Viper Ultimate", "未连接"),
+            BatteryInfo::disconnected("雷蛇毒蝰 Viper Ultimate", "未连接"),
         );
-        let tooltip = tooltip_text("mchose-a5-v3-ultra-plus", &samples);
-        // 断言关键片段而不是整串，新增设备时不必改这条测试。
-        assert!(tooltip.contains("VT9 AIR · 读取中…"), "实际: {tooltip}");
-        assert!(
-            tooltip.contains("毒蝰终极版 Viper Ultimate · 未连接"),
-            "实际: {tooltip}"
-        );
+        // 只选了迈从鼠标 + VGN 键盘；未选的雷柏/雷蛇不应出现在 tip。
+        let selected = SelectedByCategory {
+            mouse: Some("mchose-a5-v3-ultra-plus".into()),
+            keyboard: Some("vgn-s99".into()),
+            headset: None,
+        };
+        let tooltip = tooltip_text("mchose-a5-v3-ultra-plus", &selected, &samples);
         assert!(
             tooltip.contains("✓ 迈从 A5 V3 Ultra+ · 88%"),
             "实际: {tooltip}"
         );
         assert!(tooltip.contains("VGN S99 · 读取中…"), "实际: {tooltip}");
-        // 每只已注册设备都应在提示里出现一次。
-        assert_eq!(
-            tooltip.lines().count(),
-            devices::list_meta().len(),
-            "提示行数应等于已注册设备数，实际: {tooltip}"
-        );
+        assert!(!tooltip.contains("VT9 AIR"), "实际: {tooltip}");
+        assert!(!tooltip.contains("Viper Ultimate"), "实际: {tooltip}");
+        assert_eq!(tooltip.lines().count(), 2, "实际: {tooltip}");
+    }
+
+    #[test]
+    fn tooltip_fills_active_category_when_selection_empty() {
+        let selected = SelectedByCategory::default();
+        let tooltip = tooltip_text("vt9-air", &selected, &HashMap::new());
+        assert!(tooltip.contains("VT9 AIR"), "实际: {tooltip}");
+        assert_eq!(tooltip.lines().count(), 1, "实际: {tooltip}");
+        assert!(!tooltip.contains("VGN S99"), "实际: {tooltip}");
     }
 
     #[test]
