@@ -273,8 +273,11 @@ fn draw_digit(buf: &mut [u8], size: u32, ox: i32, oy: i32, d: u8, r: u8, g: u8, 
     }
 }
 
-/// 生成带电量数字的托盘图标。
-fn make_battery_icon(percent: Option<u8>) -> Image<'static> {
+/// 生成托盘图标。
+///
+/// `Charging` / `Unsupported` 两种形态**不画电量填充、不画百分比数字**，
+/// 而是画闪电 / 感叹号，并把电池外框染成对应颜色——否则空电池会被读成 0%。
+fn make_battery_icon(mode: IconMode) -> Image<'static> {
     const S: u32 = 32;
     let mut buf = vec![0u8; (S * S * 4) as usize];
     // 深色底
@@ -285,29 +288,41 @@ fn make_battery_icon(percent: Option<u8>) -> Image<'static> {
         buf[i * 4 + 3] = 255;
     }
 
-    let (fr, fg, fb) = match percent {
-        Some(p) if p <= 15 => (239u8, 68, 68),
-        Some(p) if p <= 30 => (245, 158, 11),
-        Some(_) => (52, 211, 153),
-        None => (148, 163, 184),
+    // 填充色：有百分比按电量分档；充电/不支持用各自的主题色
+    let (fr, fg, fb) = match mode {
+        IconMode::Level(Some(p)) if p <= 15 => (239u8, 68, 68),
+        IconMode::Level(Some(p)) if p <= 30 => (245, 158, 11),
+        IconMode::Level(Some(_)) => (52, 211, 153),
+        IconMode::Charging => (56, 189, 248),
+        IconMode::Unsupported => (245, 158, 11),
+        IconMode::Level(None) => (148, 163, 184),
+    };
+    // 外框色：充电/不支持时染成主题色，让整枚图标一眼区别于「0% 空电池」
+    let (kr, kg, kb) = match mode {
+        IconMode::Charging => (56u8, 189, 248),
+        IconMode::Unsupported => (245u8, 158, 11),
+        _ => (200u8, 200, 210),
     };
 
     // 电池外框
     for x in 4..26 {
-        put_px(&mut buf, S, x, 8, 200, 200, 210, 255);
-        put_px(&mut buf, S, x, 22, 200, 200, 210, 255);
+        put_px(&mut buf, S, x, 8, kr, kg, kb, 255);
+        put_px(&mut buf, S, x, 22, kr, kg, kb, 255);
     }
     for y in 8..23 {
-        put_px(&mut buf, S, 4, y, 200, 200, 210, 255);
-        put_px(&mut buf, S, 25, y, 200, 200, 210, 255);
+        put_px(&mut buf, S, 4, y, kr, kg, kb, 255);
+        put_px(&mut buf, S, 25, y, kr, kg, kb, 255);
     }
     for y in 12..19 {
-        put_px(&mut buf, S, 26, y, 200, 200, 210, 255);
-        put_px(&mut buf, S, 27, y, 200, 200, 210, 255);
+        put_px(&mut buf, S, 26, y, kr, kg, kb, 255);
+        put_px(&mut buf, S, 27, y, kr, kg, kb, 255);
     }
 
-    // 电量填充
-    let fill = percent.unwrap_or(0) as i32;
+    // 电量填充：只有拿到百分比才填
+    let fill = match mode {
+        IconMode::Level(Some(p)) => p as i32,
+        _ => 0,
+    };
     let inner_w = 19;
     let filled = (inner_w * fill / 100).clamp(0, inner_w);
     for x in 0..filled {
@@ -316,18 +331,60 @@ fn make_battery_icon(percent: Option<u8>) -> Image<'static> {
         }
     }
 
-    // 顶部画百分比数字（两位；100 显示 99 避免挤爆）
-    if let Some(p) = percent {
-        let show = p.min(99);
-        let tens = show / 10;
-        let ones = show % 10;
-        draw_digit(&mut buf, S, 7, 11, tens, 15, 15, 20);
-        draw_digit(&mut buf, S, 15, 11, ones, 15, 15, 20);
-    } else {
+    match mode {
+        // 顶部画百分比数字（两位；100 显示 99 避免挤爆）
+        IconMode::Level(Some(p)) => {
+            let show = p.min(99);
+            let tens = show / 10;
+            let ones = show % 10;
+            draw_digit(&mut buf, S, 7, 11, tens, 15, 15, 20);
+            draw_digit(&mut buf, S, 15, 11, ones, 15, 15, 20);
+        }
         // 未读到：中间一条灰杠
-        for x in 10..22 {
-            put_px(&mut buf, S, x, 15, 100, 100, 110, 255);
-            put_px(&mut buf, S, x, 16, 100, 100, 110, 255);
+        IconMode::Level(None) => {
+            for x in 10..22 {
+                put_px(&mut buf, S, x, 15, 100, 100, 110, 255);
+                put_px(&mut buf, S, x, 16, 100, 100, 110, 255);
+            }
+        }
+        // 充电中：闪电符号
+        IconMode::Charging => {
+            const BOLT: [(i32, i32); 20] = [
+                (17, 9),
+                (18, 9),
+                (16, 10),
+                (17, 10),
+                (15, 11),
+                (16, 11),
+                (14, 12),
+                (15, 12),
+                (16, 12),
+                (17, 12),
+                (15, 13),
+                (16, 13),
+                (17, 13),
+                (18, 13),
+                (16, 14),
+                (17, 14),
+                (15, 15),
+                (16, 15),
+                (14, 16),
+                (15, 16),
+            ];
+            for &(x, y) in &BOLT {
+                put_px(&mut buf, S, x, y, fr, fg, fb, 255);
+            }
+        }
+        // 型号不支持：感叹号
+        IconMode::Unsupported => {
+            for y in 10..18 {
+                put_px(&mut buf, S, 15, y, fr, fg, fb, 255);
+                put_px(&mut buf, S, 16, y, fr, fg, fb, 255);
+            }
+            for y in 20..22 {
+                put_px(&mut buf, S, 15, y, fr, fg, fb, 255);
+                put_px(&mut buf, S, 16, y, fr, fg, fb, 255);
+            }
         }
     }
 
@@ -424,12 +481,40 @@ fn tray_menu_entries() -> Vec<TrayMenuEntry> {
 
 fn battery_status(info: Option<&BatteryInfo>) -> String {
     match info {
+        // 型号不受支持：直说，不能和「读不到电量」混在一起。
+        Some(info) if info.unsupported => "型号不支持".into(),
         Some(info) => match info.percent {
             Some(percent) => format!("{percent}%"),
+            // 充电但没有百分比（如 S9 Pro 的 0xE4 哨兵值）：说「充电中」，
+            // 不能说「电量未知」——那不是读失败，是厂商此时不给百分比。
+            None if info.charging == Some(true) => "充电中".into(),
             None if info.connected => "电量未知".into(),
             None => "未连接".into(),
         },
         None => "读取中…".into(),
+    }
+}
+
+/// 托盘图标要画成哪种形态。
+///
+/// 「充电无百分比」和「型号不支持」都**不能画成 0% 电量**——前者是厂商不给数，
+/// 后者是这只设备根本不归本插件管，画 0% 都会让用户以为没电了。
+#[derive(Debug, PartialEq, Eq)]
+enum IconMode {
+    /// 有百分比（或完全没采样到）。
+    Level(Option<u8>),
+    /// 充电中但拿不到百分比：画闪电。
+    Charging,
+    /// 型号不受支持：画感叹号。
+    Unsupported,
+}
+
+fn icon_mode(info: Option<&BatteryInfo>) -> IconMode {
+    match info {
+        Some(info) if info.unsupported => IconMode::Unsupported,
+        Some(info) if info.percent.is_none() && info.charging == Some(true) => IconMode::Charging,
+        Some(info) => IconMode::Level(info.percent),
+        None => IconMode::Level(None),
     }
 }
 
@@ -561,8 +646,8 @@ fn redraw_tray(app: &AppHandle) {
         return;
     };
     let _ = tray.set_tooltip(Some(&tip));
-    let percent = samples.get(&active).and_then(|info| info.percent);
-    let _ = tray.set_icon(Some(make_battery_icon(percent)));
+    let mode = icon_mode(samples.get(&active));
+    let _ = tray.set_icon(Some(make_battery_icon(mode)));
     if let Ok(menu) = build_tray_menu(app, &active, &samples) {
         let _ = tray.set_menu(Some(menu));
     }
@@ -705,7 +790,7 @@ pub fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
     let samples = HashMap::new();
     let menu = build_tray_menu(app.handle(), &selected, &samples)?;
-    let icon = make_battery_icon(None);
+    let icon = make_battery_icon(IconMode::Level(None));
     let selected_by_category = read_selected_by_category(app.handle());
     let tip = tooltip_text(&selected, &selected_by_category, &samples);
 
@@ -828,6 +913,8 @@ mod tests {
                 connected: true,
                 device: "迈从 A5 V3 Ultra+".into(),
                 detail: String::new(),
+                unsupported: false,
+                model_uncertain: false,
             },
         );
         samples.insert(
@@ -858,6 +945,68 @@ mod tests {
         assert!(tooltip.contains("VT9 AIR"), "实际: {tooltip}");
         assert_eq!(tooltip.lines().count(), 1, "实际: {tooltip}");
         assert!(!tooltip.contains("VGN S99"), "实际: {tooltip}");
+    }
+
+    /// 托盘要把「充电无百分比」和「型号不支持」与「读失败」分开显示。
+    ///
+    /// review 意见 #2：这两种状态原先都落到「电量未知」，用户看不出区别；
+    /// 图标还会按 0% 画，看起来像没电了。
+    #[test]
+    fn tray_distinguishes_charging_and_unsupported_from_read_failure() {
+        // 充电哨兵：connected + charging + 无百分比
+        let charging = BatteryInfo {
+            percent: None,
+            charging: Some(true),
+            connected: true,
+            device: "Gaming 2.4G".into(),
+            detail: "正在充电".into(),
+            unsupported: false,
+            model_uncertain: true,
+        };
+        assert_eq!(battery_status(Some(&charging)), "充电中");
+        // 充电时不画成 0%：图标走闪电形态
+        assert_eq!(icon_mode(Some(&charging)), IconMode::Charging);
+
+        // 型号不支持
+        let unsupported = BatteryInfo::unsupported("前行者 S9 Ultra（未支持）", "本版只适配 S9 Pro");
+        assert_eq!(battery_status(Some(&unsupported)), "型号不支持");
+        assert_eq!(icon_mode(Some(&unsupported)), IconMode::Unsupported);
+
+        // 真读失败（已连接、无电量、未充电）：仍是「电量未知」，不能和上面两种混
+        let failed = BatteryInfo {
+            percent: None,
+            charging: None,
+            connected: true,
+            device: "Gaming 2.4G".into(),
+            detail: "没读到回包".into(),
+            unsupported: false,
+            model_uncertain: false,
+        };
+        assert_eq!(battery_status(Some(&failed)), "电量未知");
+        assert_eq!(icon_mode(Some(&failed)), IconMode::Level(None));
+
+        // 有百分比的充电：继续显示百分比（作者明确要求）
+        let charging_with_level = BatteryInfo {
+            percent: Some(80),
+            charging: Some(true),
+            connected: true,
+            device: "x".into(),
+            detail: String::new(),
+            unsupported: false,
+            model_uncertain: false,
+        };
+        assert_eq!(battery_status(Some(&charging_with_level)), "80%");
+        assert_eq!(
+            icon_mode(Some(&charging_with_level)),
+            IconMode::Level(Some(80))
+        );
+
+        // 未连接 / 无样本
+        assert_eq!(
+            battery_status(Some(&BatteryInfo::disconnected("x", "未连接"))),
+            "未连接"
+        );
+        assert_eq!(battery_status(None), "读取中…");
     }
 
     #[test]

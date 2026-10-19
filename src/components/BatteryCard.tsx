@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty'
+type BatteryLevel = 'high' | 'mid' | 'low' | 'unknown' | 'empty' | 'charging' | 'unsupported'
 
 interface Props {
   deviceName: string
@@ -25,6 +25,8 @@ const LEVEL_LABEL: Record<BatteryLevel, string> = {
   low: '电量偏低',
   unknown: '等待数据',
   empty: '未连接',
+  charging: '充电中',
+  unsupported: '型号不支持',
 }
 
 const LEVEL_STROKE: Record<BatteryLevel, string> = {
@@ -33,6 +35,8 @@ const LEVEL_STROKE: Record<BatteryLevel, string> = {
   low: 'text-red-500 dark:text-red-400',
   unknown: 'text-muted-foreground/35',
   empty: 'text-border',
+  charging: 'text-sky-500 dark:text-sky-400',
+  unsupported: 'text-muted-foreground/60',
 }
 
 const LEVEL_GLOW: Record<BatteryLevel, string> = {
@@ -41,13 +45,22 @@ const LEVEL_GLOW: Record<BatteryLevel, string> = {
   low: 'bg-red-500/10',
   unknown: 'bg-primary/5',
   empty: 'bg-transparent',
+  charging: 'bg-sky-500/10',
+  unsupported: 'bg-muted/40',
 }
 
 function levelFromInfo(info: BatteryInfo | null): BatteryLevel {
   if (!info)
     return 'unknown'
+  // 型号不支持：设备插着、但本版读不了，显示「未连接」会让人以为没插。
+  if (info.unsupported)
+    return 'unsupported'
   if (!info.connected)
     return 'empty'
+  // 充电中必须先判：部分设备充电时拿不到百分比（如前行者 S9 Pro 的 0xE4 哨兵值），
+  // 若先判 percent == null 会落到「等待数据」，用户会误以为读不到电量。
+  if (info.charging)
+    return 'charging'
   if (info.percent == null)
     return 'unknown'
   if (info.percent <= 15)
@@ -74,10 +87,15 @@ function statusText(
     return loading ? '正在读取…' : '等待读取'
   if (!info || !info.connected)
     return '设备未连接'
-  if (info.percent == null)
-    return '等待电量数据'
+  // 型号不受支持：必须直说，不能落到下面「等待电量数据」，
+  // 否则用户会去查鼠标开机/重插接收器，而真正原因是这只设备本版不支持。
+  if (info.unsupported)
+    return '该型号暂不支持'
+  // 充电中要说「充电中」，不能因为拿不到百分比就说「等待电量数据」。
   if (info.charging)
     return '充电中'
+  if (info.percent == null)
+    return '等待电量数据'
   if (info.percent <= 15)
     return '电量偏低'
   return '运行正常'
@@ -95,13 +113,35 @@ function hintText(
     return loading ? '正在从设备读取 HID 数据。' : '准备读取设备状态。'
   if (!info || !info.connected)
     return '未检测到接收器或设备，请检查连接后重试。'
+  // 型号不支持时，原因写在 detail 里（后端给出具体型号），直接显示给用户看。
+  if (info.unsupported) {
+    return info.detail || '检测到的设备型号不在本版支持范围内。'
+  }
+  // 充电中优先说明「正在充电」，而不是让人以为读不到数据。
+  if (info.charging) {
+    return info.percent == null
+      ? '正在充电。该设备充电时不上报百分比，充满或拔线后会自动更新。'
+      : '正在充电，充满后会自动更新。'
+  }
   if (info.percent == null)
     return '接收器已连接，等待鼠标唤醒。动一下鼠标或重新插拔接收器。'
-  if (info.charging)
-    return '正在充电，充满后会自动更新。'
   if (info.percent <= 15)
     return '建议尽快充电。'
   return auto ? '自动刷新已开启，电量会按间隔更新。' : '自动刷新已暂停，可随时手动刷新。'
+}
+
+/**
+ * 型号认不出来时，主界面（标题旁徽章）要显示的说明。
+ *
+ * 2.4G 接收器 PID 被同系列多型号共用时，标题的 manifest 名会把型号说死成
+ * 「前行者 S9 Pro」，而实际可能是 Ultra / Max。这条说明必须出现在主界面，
+ * 不能只放折叠的「诊断详情」（review 意见 #3）。
+ * 返回 null 表示不需要显示。
+ */
+function modelUncertainText(info: BatteryInfo | null): string | null {
+  if (!info || !info.connected || !info.model_uncertain)
+    return null
+  return '型号按 S9 系列处理'
 }
 
 function formatClock(value: Date | null): string {
@@ -265,6 +305,17 @@ export function BatteryCard({
                 <span className="border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium">
                   <Icon icon="mdi:flash" className="size-3" />
                   充电中
+                </span>
+              )}
+              {/* 型号认不出来时必须写在主界面（标题旁），不能只放折叠的诊断详情：
+                  2.4G 接收器 PID 被同系列多型号共用时，标题的 manifest 名会把型号说死。 */}
+              {modelUncertainText(info) && (
+                <span
+                  className="border-border/60 bg-muted/40 text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+                  title="2.4G 接收器 PID 由同系列多型号共用，无法从 HID 区分具体型号"
+                >
+                  <Icon icon="mdi:help-circle-outline" className="size-3" />
+                  {modelUncertainText(info)}
                 </span>
               )}
             </div>

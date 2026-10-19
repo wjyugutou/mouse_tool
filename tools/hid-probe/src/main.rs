@@ -13,6 +13,7 @@
 
 use hidapi::{DeviceInfo, HidApi};
 use std::io::Write;
+use std::thread;
 use std::time::{Duration, Instant};
 
 /// 关心的两只设备。
@@ -334,6 +335,160 @@ fn vgn_s99(api: &HidApi) -> Result<(), String> {
     Err("3 次都没拿到电量包".into())
 }
 
+/// 前行者 S9 Pro 电量探测 —— 按 `ms_pix_v1` 协议（IPI / PIAO 系）。
+///
+/// ## 协议来源
+///
+/// VID `0x372E` 是 IPI（PIAO）的厂商号，协议名 `ms_pix_v1`。
+/// 官方配置器是 WebHID 应用 `https://shan.ipigame.cn/`，协议从它的 JS 包里提取；
+/// 另有开源项目在**实机**上验证过同一套协议（含 2.4G 接收器）：
+/// `wkchew03/Mouse-Battery-Tracker` 的 `mbt/drivers/ipi.py` 与 `docs/protocols.md`。
+///
+/// ## 帧格式（63 字节 Feature 报告，Report ID 0x03）
+///
+/// ```text
+/// payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0, 0, ...]  补零到 63 字节
+/// crc     = sum(payload[1:]) % 256，放在 payload[0]
+/// ```
+///
+/// 电量不是独立命令，而是 `get_basic_info` 回包的**第 5 个字段**。
+///
+/// ## 两个必须注意的坑
+///
+/// 1. **首次读回是 5 字节状态桩**（`03 50 02 00 02`），真正的 16 字节回包要再读几次才出现。
+///    读一次就放弃，看起来和「设备不应答」完全一样 —— 这正是别人踩过的坑。
+/// 2. **充电时电量字段是哨兵值 `0xE4`(228)**，不是百分比，也拿不到真实电量
+///    （官方配置器此时也显示 228）。所以 0..=100 才是百分比。
+///
+/// ## 回包样例（实机，80% 电量）
+///
+/// ```text
+/// 03 50 00 0b 02 01 50 21 07 01 90 65 ...
+///                ^^ 电量 = 0x50 = 80
+/// ```
+///
+/// ## 安全
+///
+/// 只发 `0x4F/0x81` 这一条**只读查询**，绝不发任何 `SET_*` 写配置命令；
+/// 不调 `get_input_report`（项目硬规则）；读取最多 8 次就停，不循环轰炸。
+fn s9_pro(api: &HidApi) -> Result<(), String> {
+    const VID: u16 = 0x372E;
+    // 与插件 `qianxingzhe_s9_pro.rs` 的 `PRODUCT_IDS` 对齐：只收前行者 S9 系列。
+    // `0x1029` 是 Pro 有线；`0x1027`/`0x105E` 是 Ultra/Max 有线（探针读出后同样
+    // 会提示型号边界）；`0x1026/0x1033/0x103D/0x1055` 是三型号共用的 2.4G 接收器。
+    // **不要**把 IPI 自家机型（`0x1014/0x1015/0x1028/0x1056`）加进来：协议虽同，
+    // 但不是本设备，插件侧有回归测试 `does_not_claim_other_ipi_models` 守着。
+    const PIDS: &[u16] = &[0x1029, 0x1027, 0x105E, 0x1026, 0x1033, 0x103D, 0x1055];
+    const USAGE_PAGE: u16 = 0xFF00;
+    const REPORT_ID: u8 = 0x03;
+    const PAYLOAD_LEN: usize = 63;
+    const FRAME_MARKER: u8 = 0x50;
+    /// 首次读回的 5 字节状态桩长度。
+    const STUB_LEN: usize = 5;
+    /// 充电哨兵值。
+    const CHARGING_SENTINEL: u8 = 0xE4;
+
+    println!("=== 前行者 S9 Pro 电量探测（ms_pix_v1 / IPI 协议）===");
+
+    let Some(info) = api
+        .device_list()
+        .find(|d| d.vendor_id() == VID && PIDS.contains(&d.product_id()) && d.usage_page() == USAGE_PAGE)
+    else {
+        return Err(format!(
+            "找不到 VID_{VID:04X} 且 upage=0x{USAGE_PAGE:04X} 的厂商接口（接收器没插？）"
+        ));
+    };
+
+    println!(
+        "  接口: iface={} upage=0x{:04X} usage=0x{:04X} PID=0x{:04X} 产品={}",
+        info.interface_number(),
+        info.usage_page(),
+        info.usage(),
+        info.product_id(),
+        info.product_string().unwrap_or("-")
+    );
+
+    let dev = api
+        .open_path(info.path())
+        .map_err(|err| format!("接口打不开（官方驱动可能正占用）: {err}"))?;
+
+    // get_basic_info 命令：crc 先留 0，后面由 set_crc 填
+    let mut payload = vec![0u8; PAYLOAD_LEN];
+    payload[1] = FRAME_MARKER;
+    payload[2] = 0x00;
+    payload[3] = 0x02;
+    payload[4] = 0x4F;
+    payload[5] = 0x81;
+    payload[0] = payload[1..].iter().fold(0u8, |acc, b| acc.wrapping_add(*b));
+
+    // hidapi 的 send_feature_report 要求 buf[0] 是 Report ID
+    let mut frame = Vec::with_capacity(PAYLOAD_LEN + 1);
+    frame.push(REPORT_ID);
+    frame.extend_from_slice(&payload);
+
+    println!("  发送 {} 字节: {}", frame.len(), hex(&frame[..16]));
+
+    dev.send_feature_report(&frame)
+        .map_err(|err| format!("send_feature_report 失败: {err}"))?;
+    println!("  send_feature_report: OK");
+
+    // 首次读回是状态桩，必须继续读。最多 8 次，每次间隔 50ms。
+    for attempt in 1..=8 {
+        thread::sleep(Duration::from_millis(50));
+
+        // 关键坑：缓冲区不足 64 字节时设备直接报 read error，必须给满
+        let mut buf = vec![0u8; PAYLOAD_LEN + 1];
+        buf[0] = REPORT_ID;
+
+        match dev.get_feature_report(&mut buf) {
+            Ok(len) => {
+                println!("\n  第 {attempt}/8 次读回：{len} 字节");
+                println!("    {}", hex(&buf[..len]));
+
+                if len <= STUB_LEN {
+                    // 3 字节或 5 字节的都是状态桩
+                    println!("    → 这是状态桩（≤{STUB_LEN} 字节），继续读");
+                    continue;
+                }
+
+                if buf[1] != FRAME_MARKER {
+                    println!(
+                        "    → 帧标记不是 0x50（实际 0x{:02X}），不是 basic_info 回包，继续读",
+                        buf[1]
+                    );
+                    continue;
+                }
+
+                if buf[4] != 0x02 {
+                    println!(
+                        "    → 命令码不符（buf[4]=0x{:02X}，期望 0x02），继续读",
+                        buf[4]
+                    );
+                    continue;
+                }
+
+                let level = buf[6];
+                println!("\n  ✓ 收到 basic_info 回包");
+                println!("    buf[1]=0x50 帧标记 ✓  buf[4]=0x02 命令码 ✓");
+                if level == CHARGING_SENTINEL {
+                    println!("    → 电量字段 = 0xE4(228) = 充电哨兵值");
+                    println!("    → 正在充电，此状态拿不到百分比（官方配置器同样只显示 228）");
+                } else if level <= 100 {
+                    println!("    → 电量 = buf[6] = {level}%");
+                } else {
+                    println!("    → 电量字段 = {level}，不在 0..=100 也不是哨兵值，无法判定");
+                }
+                return Ok(());
+            }
+            Err(err) => {
+                println!("  第 {attempt}/8 次读失败: {err}");
+            }
+        }
+    }
+
+    Err("8 次都没读到 basic_info 回包（只读到状态桩）".into())
+}
+
 fn parse_vid(raw: Option<&String>) -> u16 {
     raw.and_then(|raw| u16::from_str_radix(raw.trim_start_matches("0x"), 16).ok())
         .unwrap_or(0x320F)
@@ -359,6 +514,12 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Some("s9pro") => {
+            if let Err(err) = s9_pro(&api) {
+                eprintln!("{err}");
+                std::process::exit(1);
+            }
+        }
         Some("watch") => {
             let vid = parse_vid(args.get(1));
             let secs = args.get(2).and_then(|raw| raw.parse().ok()).unwrap_or(20);
@@ -375,6 +536,9 @@ fn main() {
             println!("  hid-probe watch 0x372E 25      被动监听 前行者 接收器 25 秒");
             println!(
                 "  hid-probe vgn                  按 WsServe 协议读 VGN S99 电量（只发 0x1A）"
+            );
+            println!(
+                "  hid-probe s9pro                读前行者 S9 Pro 电量（ms_pix_v1，Feature 0x03，只发只读查询 0x4F/0x81）"
             );
         }
     }
