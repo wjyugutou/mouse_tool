@@ -225,13 +225,8 @@ fn tray_visible_levels(
 /// 在 32×32 上画电池：只选 1 类 → 单颗横向大电池；≥2 类 → 并排竖向小电池。
 fn make_tray_battery_icon(slots: &[TraySlotLevel]) -> Image<'static> {
     const S: u32 = 32;
+    // 未绘制像素保持 RGBA(0,0,0,0)，Windows 托盘才能透出任务栏，避免「大黑边」。
     let mut buf = vec![0u8; (S * S * 4) as usize];
-    for i in 0..(S * S) as usize {
-        buf[i * 4] = 28;
-        buf[i * 4 + 1] = 28;
-        buf[i * 4 + 2] = 34;
-        buf[i * 4 + 3] = 255;
-    }
 
     let n = slots.len().clamp(1, 3);
     if n == 1 {
