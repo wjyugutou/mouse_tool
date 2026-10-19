@@ -135,6 +135,7 @@ fn read_mchose_a5_v3_ultra_battery() -> Result<BatteryInfo, String> {
                 "未找到迈从电量命令集合（VID {MCHOSE_VID:04X} PID {RECEIVER_PID:04X}）。{hint}{dock}"
             ),
             unsupported: false,
+            model_uncertain: false,
         });
     }
 
@@ -196,6 +197,7 @@ fn read_mchose_a5_v3_ultra_battery() -> Result<BatteryInfo, String> {
             errors.join(" · ")
         ),
         unsupported: false,
+        model_uncertain: false,
     })
 }
 
@@ -338,6 +340,7 @@ fn parse_mailbox_info(data: &[u8]) -> Result<BatteryInfo, String> {
             if charging { "充电中" } else { "未充电" }
         ),
         unsupported: false,
+        model_uncertain: false,
     })
 }
 
@@ -439,6 +442,7 @@ fn parse_legacy_status(resp: &[u8]) -> Result<BatteryInfo, String> {
             if charging { "充电中" } else { "未充电" }
         ),
         unsupported: false,
+        model_uncertain: false,
     })
 }
 

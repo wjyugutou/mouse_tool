@@ -280,6 +280,7 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
                 enum_notes.join("; ")
             ),
             unsupported: false,
+            model_uncertain: false,
         });
     };
 
@@ -336,6 +337,8 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
         }
         _ => String::new(),
     };
+    // 主界面要能看见这件事，不能只写在折叠的诊断详情里（review 意见 #3）。
+    let model_uncertain = model_is_uncertain(&model);
 
     match read_once(&device) {
         Ok(reading) => {
@@ -356,8 +359,9 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
                 connected: true,
                 device: device_name,
                 detail,
-            unsupported: false,
-        })
+                unsupported: false,
+                model_uncertain,
+            })
         }
         // 打不开 / 写不进去 = 此刻拿不到设备
         Err(ReadError::Write(err)) => Ok(BatteryInfo::disconnected(
@@ -371,11 +375,17 @@ fn read_s9_pro_battery() -> Result<BatteryInfo, String> {
             connected: true,
             device: device_name,
             detail: format!(
-                "已连接接收器，但没读到电量: {err}。请确认鼠标已开机并与接收器配对。"
+                "已连接接收器，但没读到电量: {err}。请确认鼠标已开机并与接收器配对。{model_note}"
             ),
             unsupported: false,
+            model_uncertain,
         }),
     }
+}
+
+/// 型号是否认不出来。共用 2.4G 接收器 PID 时为真；有线 PID 能唯一确认型号时为假。
+fn model_is_uncertain(model: &ModelGuess) -> bool {
+    matches!(model, ModelGuess::SharedReceiver)
 }
 
 /// 读电量的失败方式。壳层要区分「拿不到设备」和「设备没回答」。

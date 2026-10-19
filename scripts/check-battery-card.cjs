@@ -44,7 +44,7 @@ function extract(name) {
 
 // Web 端特有的 API 在这个脚本里用不到，去掉 TS 注解后直接执行。
 // 参数签名可能跨行，所以先把「( ... )」之间的类型注解整段清掉，再清返回值类型。
-const stripped = ['levelFromInfo', 'statusText', 'hintText']
+const stripped = ['levelFromInfo', 'statusText', 'hintText', 'modelUncertainText']
   .map((name) => {
     let body = extract(name)
     // 清掉参数列表里的类型注解：形如 `info: BatteryInfo | null,` / `error: string | null,`
@@ -72,7 +72,7 @@ if (Object.keys(LEVEL_LABEL).length === 0)
 // eslint-disable-next-line no-new-func
 const factory = new Function(`${stripped}
   const LEVEL_LABEL = ${JSON.stringify(LEVEL_LABEL)}
-  return { levelFromInfo, statusText, hintText, LEVEL_LABEL }`)
+  return { levelFromInfo, statusText, hintText, modelUncertainText, LEVEL_LABEL }`)
 const fn = factory()
 
 // 前行者 S9 Pro 充电时的真实形态：charging=true，percent=null（0xE4 哨兵值）
@@ -93,6 +93,20 @@ const unsupportedModel = {
   unsupported: true,
   detail: '检测到 S9 Ultra（有线 PID 0x1027），本版只适配 S9 Pro，暂不读取电量。',
 }
+// 型号认不出来（2.4G 共用接收器 PID，本机最常见路径）：电量能读，但型号说不得死
+const uncertainModel = {
+  connected: true,
+  charging: null,
+  percent: 52,
+  model_uncertain: true,
+}
+// 有线 PID 唯一确认 Pro：不该显示型号说明
+const confirmedPro = {
+  connected: true,
+  charging: null,
+  percent: 52,
+  model_uncertain: false,
+}
 
 const cases = [
   {
@@ -102,6 +116,24 @@ const cases = [
     hint: fn.hintText(unsupportedModel, false, null, true),
     expect: { level: 'unsupported', status: '该型号暂不支持' },
     hintMustContain: 'S9 Ultra',
+  },
+  {
+    name: '型号认不出来（共用 2.4G 接收器）：主界面要有可见说明',
+    level: fn.levelFromInfo(uncertainModel),
+    status: fn.statusText(uncertainModel, false, null),
+    hint: fn.hintText(uncertainModel, false, null, true),
+    expect: { level: 'high', status: '运行正常' },
+    badge: fn.modelUncertainText(uncertainModel),
+    expectBadge: '型号按 S9 系列处理',
+  },
+  {
+    name: '有线 PID 确认 Pro：不该出现型号说明',
+    level: fn.levelFromInfo(confirmedPro),
+    status: fn.statusText(confirmedPro, false, null),
+    hint: fn.hintText(confirmedPro, false, null, true),
+    expect: { level: 'high', status: '运行正常' },
+    badge: fn.modelUncertainText(confirmedPro),
+    expectBadge: null,
   },
   {
     name: '充电中且拿不到百分比（S9 Pro 真机形态）',
@@ -147,17 +179,24 @@ for (const c of cases) {
   const okLevel = c.level === c.expect.level
   const okStatus = c.status === c.expect.status
   const okHint = !c.hintMustContain || c.hint.includes(c.hintMustContain)
-  if (!okLevel || !okStatus || !okHint)
+  // badge 只在用例声明了 expectBadge 时才校验（undefined 表示该场景不关心徽章）
+  const okBadge = !('expectBadge' in c) || c.badge === c.expectBadge
+  const ok = okLevel && okStatus && okHint && okBadge
+  if (!ok)
     failed++
-  console.log(`${okLevel && okStatus && okHint ? '✓' : '✗'} ${c.name}`)
+  console.log(`${ok ? '✓' : '✗'} ${c.name}`)
   console.log(`    level=${c.level}(显示「${levelLabel}」) status=「${c.status}」`)
   console.log(`    hint=「${c.hint}」`)
+  if ('expectBadge' in c)
+    console.log(`    主界面徽章=${c.badge === null ? '(不显示)' : `「${c.badge}」`}`)
   if (!okLevel)
     console.log(`    !! 期望 level=${c.expect.level}`)
   if (!okStatus)
     console.log(`    !! 期望 status=${c.expect.status}`)
   if (!okHint)
     console.log(`    !! hint 应包含「${c.hintMustContain}」`)
+  if (!okBadge)
+    console.log(`    !! 期望徽章=${c.expectBadge === null ? '(不显示)' : `「${c.expectBadge}」`}`)
 }
 
 console.log(`\n结果：${cases.length - failed}/${cases.length} 通过`)

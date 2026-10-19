@@ -24,7 +24,7 @@ pub struct DeviceMeta {
 }
 
 /// 电量结果。字段名与前端 `BatteryInfo` 一致。
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Default)]
 pub struct BatteryInfo {
     pub percent: Option<u8>,
     pub charging: Option<bool>,
@@ -37,29 +37,30 @@ pub struct BatteryInfo {
     /// `#[serde(default)]` 让旧插件与旧数据不用改；序列化时总是带上（false）。
     #[serde(default)]
     pub unsupported: bool,
+    /// 已连接、电量也读到了，但**具体型号认不出来**（例如 2.4G 接收器 PID
+    /// 被同系列多型号共用）。主界面要如实说明，不能把型号说死。
+    /// `#[serde(default)]` 同 `unsupported`。
+    #[serde(default)]
+    pub model_uncertain: bool,
 }
 
 impl BatteryInfo {
     pub fn disconnected(device: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
-            percent: None,
-            charging: None,
-            connected: false,
             device: device.into(),
             detail: detail.into(),
-            unsupported: false,
+            ..Default::default()
         }
     }
 
     /// 已连接，但型号不受支持。界面上要把原因说清楚，不能只说「读不到电量」。
     pub fn unsupported(device: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
-            percent: None,
-            charging: None,
             connected: true,
             device: device.into(),
             detail: detail.into(),
             unsupported: true,
+            ..Default::default()
         }
     }
 }

@@ -130,6 +130,20 @@ function hintText(
   return auto ? '自动刷新已开启，电量会按间隔更新。' : '自动刷新已暂停，可随时手动刷新。'
 }
 
+/**
+ * 型号认不出来时，主界面（标题旁徽章）要显示的说明。
+ *
+ * 2.4G 接收器 PID 被同系列多型号共用时，标题的 manifest 名会把型号说死成
+ * 「前行者 S9 Pro」，而实际可能是 Ultra / Max。这条说明必须出现在主界面，
+ * 不能只放折叠的「诊断详情」（review 意见 #3）。
+ * 返回 null 表示不需要显示。
+ */
+function modelUncertainText(info: BatteryInfo | null): string | null {
+  if (!info || !info.connected || !info.model_uncertain)
+    return null
+  return '型号按 S9 系列处理'
+}
+
 function formatClock(value: Date | null): string {
   if (!value)
     return '—'
@@ -291,6 +305,17 @@ export function BatteryCard({
                 <span className="border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400 inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium">
                   <Icon icon="mdi:flash" className="size-3" />
                   充电中
+                </span>
+              )}
+              {/* 型号认不出来时必须写在主界面（标题旁），不能只放折叠的诊断详情：
+                  2.4G 接收器 PID 被同系列多型号共用时，标题的 manifest 名会把型号说死。 */}
+              {modelUncertainText(info) && (
+                <span
+                  className="border-border/60 bg-muted/40 text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+                  title="2.4G 接收器 PID 由同系列多型号共用，无法从 HID 区分具体型号"
+                >
+                  <Icon icon="mdi:help-circle-outline" className="size-3" />
+                  {modelUncertainText(info)}
                 </span>
               )}
             </div>

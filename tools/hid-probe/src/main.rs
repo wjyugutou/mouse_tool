@@ -373,9 +373,12 @@ fn vgn_s99(api: &HidApi) -> Result<(), String> {
 /// 不调 `get_input_report`（项目硬规则）；读取最多 8 次就停，不循环轰炸。
 fn s9_pro(api: &HidApi) -> Result<(), String> {
     const VID: u16 = 0x372E;
-    // 已确认的 PID：0x1014 无线接收器、0x1015 有线、0x1028 / 0x1056 有线。
-    // 本机实测这个接收器是 0x103D，同样走 0xFF00 厂商口，一并支持。
-    const PIDS: &[u16] = &[0x1014, 0x1015, 0x1028, 0x1056, 0x103D];
+    // 与插件 `qianxingzhe_s9_pro.rs` 的 `PRODUCT_IDS` 对齐：只收前行者 S9 系列。
+    // `0x1029` 是 Pro 有线；`0x1027`/`0x105E` 是 Ultra/Max 有线（探针读出后同样
+    // 会提示型号边界）；`0x1026/0x1033/0x103D/0x1055` 是三型号共用的 2.4G 接收器。
+    // **不要**把 IPI 自家机型（`0x1014/0x1015/0x1028/0x1056`）加进来：协议虽同，
+    // 但不是本设备，插件侧有回归测试 `does_not_claim_other_ipi_models` 守着。
+    const PIDS: &[u16] = &[0x1029, 0x1027, 0x105E, 0x1026, 0x1033, 0x103D, 0x1055];
     const USAGE_PAGE: u16 = 0xFF00;
     const REPORT_ID: u8 = 0x03;
     const PAYLOAD_LEN: usize = 63;

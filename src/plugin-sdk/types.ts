@@ -14,6 +14,12 @@ export interface BatteryInfo {
    * 缺省（undefined / null）等同 false，旧插件不用改。
    */
   unsupported?: boolean
+  /**
+   * 已连接、电量也能读，但**具体型号认不出来**（例如 2.4G 接收器 PID
+   * 被同系列多型号共用）。主界面要如实说明，不能把型号说死。
+   * 缺省（undefined / null）等同 false。
+   */
+  model_uncertain?: boolean
 }
 
 /** 一级分类。顺序即首页分类栏顺序，与 Rust `DeviceCategory` 一致。 */

@@ -193,6 +193,7 @@ fn read_vgn_s99_battery() -> Result<BatteryInfo, String> {
                     "未找到 VGN S99 接收器（VID {VGN_VID:04X} PID {RECEIVER_PID:04X}）。请插好 2.4G 接收器。"
                 ),
                 unsupported: false,
+                model_uncertain: false,
             });
         }
         return Ok(BatteryInfo {
@@ -205,6 +206,7 @@ fn read_vgn_s99_battery() -> Result<BatteryInfo, String> {
                 enum_notes.join("; ")
             ),
             unsupported: false,
+            model_uncertain: false,
         });
     };
 
@@ -238,6 +240,7 @@ fn read_vgn_s99_battery() -> Result<BatteryInfo, String> {
                 if charging { "充电中" } else { "未充电" }
             ),
             unsupported: false,
+            model_uncertain: false,
         }),
         // 写不进去 = 此刻拿不到设备，按未连接报，不让界面显示半截状态。
         Err(ReadError::Write(err)) => Ok(BatteryInfo::disconnected(
@@ -255,6 +258,7 @@ fn read_vgn_s99_battery() -> Result<BatteryInfo, String> {
                 "已连接接收器，但没读到电量: {err}。请确认键盘已开机并与接收器配对；若开着 VGN VHUB 请先退出（HID 会被独占）。"
             ),
             unsupported: false,
+            model_uncertain: false,
         }),
     }
 }

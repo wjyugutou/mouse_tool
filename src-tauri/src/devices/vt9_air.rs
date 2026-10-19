@@ -57,6 +57,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
             device: device_label,
             detail: "未找到 Rapoo 接收器。若刚卡死过，请拔插接收器。".into(),
             unsupported: false,
+            model_uncertain: false,
         });
     }
     if vendor_paths.is_empty() {
@@ -67,6 +68,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
             device: format!("Rapoo {RAPOO_VID:04X}:1200"),
             detail: format!("没有 FF00/0002 集合。接口: {summary}"),
             unsupported: false,
+            model_uncertain: false,
         });
     }
 
@@ -126,6 +128,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
                             device: format!("Rapoo {RAPOO_VID:04X}:{pid:04X} iface={iface}"),
                             detail: format!("中断 IN(抓包同款 EP0x84) · {hex}"),
                             unsupported: false,
+                            model_uncertain: false,
                         });
                     }
                 }
@@ -145,6 +148,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
                 LISTEN_MS = LISTEN_FOR.as_millis()
             ),
             unsupported: false,
+            model_uncertain: false,
         });
     }
 
@@ -160,6 +164,7 @@ fn read_vt9_battery() -> Result<BatteryInfo, String> {
         device: device_label,
         detail: format!("未找到含 Report 0xBB 的集合。{open_note}接口: {summary}"),
         unsupported: false,
+        model_uncertain: false,
     })
 }
 
