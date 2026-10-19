@@ -1,5 +1,11 @@
 /** 设置页：外观、刷新间隔、关窗是否进托盘、关于。 */
-import type { CloseBehavior, ThemeMode } from '@/stores/settings'
+import type { DeviceCategory } from '@/devices'
+import { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from '@/plugin-sdk'
+import {
+  normalizeTrayCategories,
+  type CloseBehavior,
+  type ThemeMode,
+} from '@/stores/settings'
 import { Icon } from '@iconify/react'
 import { useNavigate } from '@tanstack/react-router'
 import { invoke } from '@tauri-apps/api/core'
@@ -43,10 +49,12 @@ export function SettingsPage() {
   const themeMode = useSettingsStore(s => s.themeMode)
   const closeBehavior = useSettingsStore(s => s.closeBehavior)
   const launchAtLogin = useSettingsStore(s => s.launchAtLogin)
+  const trayCategories = useSettingsStore(s => s.trayCategories)
   const setAutoIntervalSec = useSettingsStore(s => s.setAutoIntervalSec)
   const setThemeMode = useSettingsStore(s => s.setThemeMode)
   const setCloseBehavior = useSettingsStore(s => s.setCloseBehavior)
   const setLaunchAtLogin = useSettingsStore(s => s.setLaunchAtLogin)
+  const setTrayCategories = useSettingsStore(s => s.setTrayCategories)
   const reset = useSettingsStore(s => s.reset)
 
   // 与系统开机自启状态对齐一次
@@ -110,10 +118,12 @@ export function SettingsPage() {
             ? (
                 <AppearancePanel
                   autoIntervalSec={autoIntervalSec}
+                  trayCategories={trayCategories}
                   themeMode={themeMode}
                   closeBehavior={closeBehavior}
                   launchAtLogin={launchAtLogin}
                   onAutoIntervalSecChange={setAutoIntervalSec}
+                  onTrayCategoriesChange={setTrayCategories}
                   onThemeModeChange={(mode) => {
                     setThemeMode(mode)
                     applyThemeFromStore(mode)
@@ -182,19 +192,23 @@ function AppearancePanel({
   themeMode,
   closeBehavior,
   launchAtLogin,
+  trayCategories,
   onAutoIntervalSecChange,
   onThemeModeChange,
   onCloseBehaviorChange,
   onLaunchAtLoginChange,
+  onTrayCategoriesChange,
 }: {
   autoIntervalSec: number
   themeMode: ThemeMode
   closeBehavior: CloseBehavior
   launchAtLogin: boolean
+  trayCategories: DeviceCategory[]
   onAutoIntervalSecChange: (sec: number) => void
   onThemeModeChange: (mode: ThemeMode) => void
   onCloseBehaviorChange: (behavior: CloseBehavior) => void
   onLaunchAtLoginChange: (on: boolean) => void | Promise<void>
+  onTrayCategoriesChange: (cats: DeviceCategory[]) => void
 }) {
   const closeToTray = (closeBehavior ?? 'tray') === 'tray'
   const [autostartDiag, setAutostartDiag] = useState<AutostartDiagnostic | null>(null)
@@ -265,6 +279,38 @@ function AppearancePanel({
           />
           <p className="text-muted-foreground text-xs">
             由 `@tauri-store/zustand` 持久化，主页自动刷新会立刻跟随。
+          </p>
+        </div>
+
+        
+        <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
+          <span className="text-muted-foreground text-xs">托盘显示分类</span>
+          <div className="flex gap-2">
+            {DEVICE_CATEGORIES.map((cat) => {
+              const checked = trayCategories.includes(cat)
+              return (
+                <label key={cat} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(value) => {
+                      const on = value === true
+                      const next = on
+                        ? normalizeTrayCategories([...trayCategories, cat])
+                        : normalizeTrayCategories(trayCategories.filter(c => c !== cat))
+                      // 至少保留一项
+                      if (next.length === 0)
+                        return
+                      onTrayCategoriesChange(next)
+                    }}
+                    aria-label={`托盘显示${DEVICE_CATEGORY_LABEL[cat]}`}
+                  />
+                  <span>{DEVICE_CATEGORY_LABEL[cat]}</span>
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            勾选后，托盘图标与悬停提示只展示对应分类的电量（可多选）。
           </p>
         </div>
 

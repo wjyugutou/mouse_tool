@@ -23,6 +23,8 @@ interface SettingsState {
   trayDeviceId: string
   /** 首页侧栏每个分类高亮哪一只。托盘菜单另行列出全部设备。 */
   selectedByCategory: SelectedByCategory
+  /** 托盘图标与悬停 tip 要展示的分类（多选，顺序固定为鼠标→键盘→耳机） */
+  trayCategories: DeviceCategory[]
   /** 是否开机自启（与系统注册表同步由设置页调用插件维护） */
   launchAtLogin: boolean
   /** 首页和托盘共用的自动采样开关 */
@@ -31,6 +33,7 @@ interface SettingsState {
   setThemeMode: (mode: ThemeMode) => void
   setCloseBehavior: (behavior: CloseBehavior) => void
   setTrayDeviceId: (id: string) => void
+  setTrayCategories: (cats: DeviceCategory[]) => void
   setLaunchAtLogin: (on: boolean) => void
   setAutoRefresh: (on: boolean) => void
   reset: () => void
@@ -42,6 +45,8 @@ const DEFAULT_CLOSE_BEHAVIOR: CloseBehavior = 'tray'
 /** 默认托盘设备取插件表第一项，避免再写一份设备 id。 */
 const DEFAULT_TRAY_DEVICE_ID = deviceRegistry[0]?.id ?? ''
 const DEFAULT_LAUNCH_AT_LOGIN = false
+/** 托盘默认三分类都显示 */
+const DEFAULT_TRAY_CATEGORIES: DeviceCategory[] = ['mouse', 'keyboard', 'headset']
 
 /** 缺省三个分类都空着。侧栏显示时再按当前图标设备补上那一类。 */
 function emptySelection(): SelectedByCategory {
@@ -77,6 +82,17 @@ export function resolveSelectedByCategory(
   return next
 }
 
+
+/** 规范化托盘分类多选：去重、只保留合法项、按鼠标→键盘→耳机排序；至少保留一项。 */
+export function normalizeTrayCategories(
+  cats: readonly DeviceCategory[] | undefined | null,
+): DeviceCategory[] {
+  const order: DeviceCategory[] = ['mouse', 'keyboard', 'headset']
+  const set = new Set(cats ?? [])
+  const next = order.filter(c => set.has(c))
+  return next.length > 0 ? next : ['mouse']
+}
+
 /** 刷新间隔限制在 3～300 秒 */
 function clampInterval(n: number): number {
   if (!Number.isFinite(n))
@@ -90,6 +106,7 @@ export const useSettingsStore = create<SettingsState>(set => ({
   closeBehavior: DEFAULT_CLOSE_BEHAVIOR,
   trayDeviceId: DEFAULT_TRAY_DEVICE_ID,
   selectedByCategory: emptySelection(),
+  trayCategories: DEFAULT_TRAY_CATEGORIES,
   launchAtLogin: DEFAULT_LAUNCH_AT_LOGIN,
   autoRefresh: true,
   setAutoIntervalSec: sec => set({ autoIntervalSec: clampInterval(sec) }),
@@ -107,6 +124,7 @@ export const useSettingsStore = create<SettingsState>(set => ({
       },
     }))
   },
+  setTrayCategories: cats => set({ trayCategories: normalizeTrayCategories(cats) }),
   setLaunchAtLogin: launchAtLogin => set({ launchAtLogin }),
   setAutoRefresh: autoRefresh => set({ autoRefresh }),
   reset: () =>
@@ -116,6 +134,7 @@ export const useSettingsStore = create<SettingsState>(set => ({
       closeBehavior: DEFAULT_CLOSE_BEHAVIOR,
       trayDeviceId: DEFAULT_TRAY_DEVICE_ID,
       selectedByCategory: emptySelection(),
+      trayCategories: DEFAULT_TRAY_CATEGORIES,
       launchAtLogin: DEFAULT_LAUNCH_AT_LOGIN,
       autoRefresh: true,
     }),
@@ -134,6 +153,7 @@ export const settingsTauriStore = createTauriStore(
       'closeBehavior',
       'trayDeviceId',
       'selectedByCategory',
+      'trayCategories',
       'launchAtLogin',
       'autoRefresh',
     ],

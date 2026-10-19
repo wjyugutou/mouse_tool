@@ -82,6 +82,7 @@ export function MorphBot({ size = 160 }: Props) {
     })
     host.replaceChildren(bot)
 
+    // effect 清理时置 true，避免卸载后异步回调仍改 DOM/切形态
     let cancelled = false
     /**
      * 悬停检测不用 host 的 pointerenter：morph-bot 是 open shadow + SVG，
