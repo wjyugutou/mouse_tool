@@ -1,11 +1,6 @@
 /** 设置页：外观、刷新间隔、关窗是否进托盘、关于。 */
 import type { DeviceCategory } from '@/devices'
-import { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from '@/plugin-sdk'
-import {
-  normalizeTrayCategories,
-  type CloseBehavior,
-  type ThemeMode,
-} from '@/stores/settings'
+import type { CloseBehavior, ThemeMode } from '@/stores/settings'
 import { Icon } from '@iconify/react'
 import { useNavigate } from '@tanstack/react-router'
 import { invoke } from '@tauri-apps/api/core'
@@ -13,16 +8,20 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { APP_VERSION } from '@/lib/app-version'
 import { cn } from '@/lib/utils'
+import { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from '@/plugin-sdk'
 import {
+
   applyThemeFromStore,
+  normalizeTrayCategories,
   useSettingsStore,
+
 } from '@/stores/settings'
 
 type SectionId = 'appearance' | 'about'
@@ -67,12 +66,10 @@ export function SettingsPage() {
       .catch(() => {})
   }, [setLaunchAtLogin])
 
-  const visibleSections = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q)
-      return SECTIONS
-    return SECTIONS.filter(s => s.label.toLowerCase().includes(q))
-  }, [query])
+  const q = query.trim().toLowerCase()
+  const visibleSections = !q
+    ? SECTIONS
+    : SECTIONS.filter(s => s.label.toLowerCase().includes(q))
 
   const close = () => {
     void navigate({ to: '/' })
@@ -213,7 +210,7 @@ function AppearancePanel({
   const closeToTray = (closeBehavior ?? 'tray') === 'tray'
   const [autostartDiag, setAutostartDiag] = useState<AutostartDiagnostic | null>(null)
 
-  const loadAutostartDiag = useCallback(async () => {
+  async function loadAutostartDiag() {
     if (import.meta.env.DEV)
       return
     try {
@@ -223,11 +220,14 @@ function AppearancePanel({
     catch {
       setAutostartDiag(null)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    void loadAutostartDiag()
-  }, [loadAutostartDiag, launchAtLogin])
+    // 诊断拉取在 await 之后 setState，避免 effect 体内同步改状态。
+    void (async () => {
+      await loadAutostartDiag()
+    })()
+  }, [launchAtLogin])
 
   return (
     <div className="space-y-6">
@@ -282,7 +282,6 @@ function AppearancePanel({
           </p>
         </div>
 
-        
         <div className="flex w-fit min-w-60 flex-1 flex-col gap-2">
           <span className="text-muted-foreground text-xs">托盘显示分类</span>
           <div className="flex gap-2">

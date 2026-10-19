@@ -1,4 +1,5 @@
 import antfu from '@antfu/eslint-config'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default antfu(
   {
@@ -15,6 +16,15 @@ export default antfu(
     files: ['src/components/ui/**/*.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  // React Compiler rules (eslint-plugin-react-hooks recommended-latest)
+  {
+    plugins: {
+      'react-hooks': reactHooks,
+    },
+    rules: {
+      ...reactHooks.configs['recommended-latest'].rules,
     },
   },
 )

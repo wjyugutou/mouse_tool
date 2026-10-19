@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -14,21 +14,26 @@ export function TitleBar() {
   const pathname = useRouterState({ select: s => s.location.pathname })
   const [maximized, setMaximized] = useState(false)
 
-  const syncMaximized = useCallback(async () => {
+  async function syncMaximized() {
     try {
       setMaximized(await getCurrentWindow().isMaximized())
     }
     catch {
       /* browser preview */
     }
-  }, [])
+  }
 
   useEffect(() => {
-    void syncMaximized()
     let unlisten: (() => void) | undefined
+    let cancelled = false
+    // 初始态与后续 resize 都在 await 回调里 setState，避免 effect 体内同步改状态。
     void (async () => {
       try {
-        unlisten = await getCurrentWindow().onResized(() => {
+        const win = getCurrentWindow()
+        const next = await win.isMaximized()
+        if (!cancelled)
+          setMaximized(next)
+        unlisten = await win.onResized(() => {
           void syncMaximized()
         })
       }
@@ -36,8 +41,11 @@ export function TitleBar() {
         /* ignore */
       }
     })()
-    return () => unlisten?.()
-  }, [syncMaximized])
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [])
 
   const minimize = () => {
     void getCurrentWindow().minimize()
