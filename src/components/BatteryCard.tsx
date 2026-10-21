@@ -177,6 +177,15 @@ function BatteryGauge({
   const percent = text.endsWith('%') ? Number.parseInt(text, 10) : null
   const ratio = percent == null || Number.isNaN(percent) ? 0 : percent / 100
   const fill = level !== 'empty'
+  // 等待数据用虚线环：周期必须整除周长，否则 12 点接缝会缺一截。
+  const unknownDash = (() => {
+    const on = 3
+    const off = 10
+    const period = on + off
+    const count = Math.max(1, Math.round(circumference / period))
+    const fitted = circumference / count
+    return `${fitted * (on / period)} ${fitted * (off / period)}`
+  })()
 
   return (
     <div className="relative mx-auto flex size-[208px] items-center justify-center">
@@ -193,7 +202,10 @@ function BatteryGauge({
           fill="none"
           stroke="currentColor"
           strokeWidth={stroke}
-          className="text-border/60"
+          className={cn(
+            'text-border/60',
+            (level === 'unknown' || level === 'empty') && 'text-border',
+          )}
         />
         {fill && (
           <circle
@@ -203,12 +215,12 @@ function BatteryGauge({
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            strokeLinecap="round"
+            strokeLinecap={level === 'unknown' ? 'butt' : 'round'}
             className={cn(
               LEVEL_STROKE[level],
               'transition-[stroke-dashoffset,stroke] duration-700 ease-out',
             )}
-            strokeDasharray={level === 'unknown' ? '3 10' : circumference}
+            strokeDasharray={level === 'unknown' ? unknownDash : circumference}
             strokeDashoffset={level === 'unknown' ? 0 : circumference * (1 - ratio)}
           />
         )}
