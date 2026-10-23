@@ -185,8 +185,8 @@ pub(crate) fn read_shared(app: &AppHandle, device_id: &str, fresh: bool) -> Batt
 
     // 锁外读 HID。代际变了说明读的过程中换过设备，这次结果丢掉。
     // 不是图标当前那一只的结果也要留下，托盘提示要列出每一只。
-    let info = devices::read_battery(device_id);
-    let publish = {
+    let raw = devices::read_battery(device_id);
+    let (publish, info) = {
         let mut inner = hub.lock_inner();
         let now_gen = hub.generation.load(Ordering::SeqCst);
         let flight_gen = inner
@@ -195,6 +195,15 @@ pub(crate) fn read_shared(app: &AppHandle, device_id: &str, fresh: bool) -> Batt
             .filter(|flight| flight.seq == seq)
             .map(|flight| flight.generation);
         let publish = flight_gen.is_some_and(|generation| should_publish(generation, now_gen));
+        // 读空电量时沿用该设备上次有效值（休眠常见），断连 / 不支持不沿用。
+        let info = if publish {
+            match inner.samples.get(device_id) {
+                Some(cache) => keep_last_percent(&cache.info, raw.clone()),
+                None => raw.clone(),
+            }
+        } else {
+            raw.clone()
+        };
         if let Some(flight) = inner.flight.as_mut().filter(|flight| flight.seq == seq) {
             flight.done = true;
             flight.info = Some(info.clone());
@@ -211,7 +220,7 @@ pub(crate) fn read_shared(app: &AppHandle, device_id: &str, fresh: bool) -> Batt
             );
         }
         hub.flight_cvar.notify_all();
-        publish
+        (publish, info)
     };
 
     if publish {
@@ -372,6 +381,22 @@ pub async fn get_battery(app: AppHandle, device_id: String, fresh: Option<bool>)
     }
 }
 
+
+/// 休眠等场景会读到「已连接但 percent 为空」。保留该设备上次有效百分比，
+/// 托盘与首页都走同一份结果，避免界面被刷成「--」。
+pub(crate) fn keep_last_percent(prev: &BatteryInfo, next: BatteryInfo) -> BatteryInfo {
+    if next.percent.is_some() || next.unsupported || !next.connected {
+        return next;
+    }
+    match prev.percent {
+        Some(p) if prev.connected && !prev.unsupported => BatteryInfo {
+            percent: Some(p),
+            ..next
+        },
+        _ => next,
+    }
+}
+
 pub(crate) fn cache_matches(
     cache_generation: u64,
     now_generation: u64,
@@ -422,6 +447,43 @@ mod tests {
             .filter(|id| id != "mchose-a5-v3-ultra-plus")
             .collect();
         assert_eq!(&order[1..], expected.as_slice());
+    }
+
+    #[test]
+    fn sleep_read_keeps_previous_percent() {
+        let prev = BatteryInfo {
+            percent: Some(76),
+            charging: Some(false),
+            connected: true,
+            device: "毒蝰".into(),
+            detail: "ok".into(),
+            unsupported: false,
+            model_uncertain: false,
+        };
+        let asleep = BatteryInfo {
+            percent: None,
+            charging: None,
+            connected: true,
+            device: "毒蝰".into(),
+            detail: "等待唤醒".into(),
+            unsupported: false,
+            model_uncertain: false,
+        };
+        let kept = keep_last_percent(&prev, asleep.clone());
+        assert_eq!(kept.percent, Some(76));
+        assert_eq!(kept.detail, "等待唤醒");
+
+        let gone = BatteryInfo::disconnected("毒蝰", "未找到接收器");
+        assert!(keep_last_percent(&prev, gone).percent.is_none());
+
+        let unsupported = BatteryInfo::unsupported("毒蝰", "不支持");
+        assert!(keep_last_percent(&prev, unsupported).percent.is_none());
+
+        let fresh = BatteryInfo {
+            percent: Some(50),
+            ..asleep
+        };
+        assert_eq!(keep_last_percent(&prev, fresh).percent, Some(50));
     }
 
     #[test]
