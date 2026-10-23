@@ -12,16 +12,16 @@
 
 ## 目录
 
-| 作用 | 路径 |
-| --- | --- |
-| 元数据（唯一来源） | `src/plugins/<id>/manifest.json` |
-| 前端适配器 | `src/plugins/<id>/index.ts` |
-| 前端注册表 | `src/plugins/index.ts` 的 `deviceRegistry` |
-| 前端类型与 `createDeviceAdapter` | `src/plugin-sdk/` |
-| 页面用的再导出 | `src/devices/`（首页继续从这里取列表） |
-| Rust HID 实现 | `src-tauri/src/devices/<name>.rs`（文件名用下划线） |
-| Rust 契约 | `src-tauri/src/plugin_sdk.rs` |
-| Rust 注册表 | `src-tauri/src/devices/mod.rs` 的 `PLUGINS` |
+| 作用                             | 路径                                                |
+| -------------------------------- | --------------------------------------------------- |
+| 元数据（唯一来源）               | `src/plugins/<id>/manifest.json`                    |
+| 前端适配器                       | `src/plugins/<id>/index.ts`                         |
+| 前端注册表                       | `src/plugins/index.ts` 的 `deviceRegistry`          |
+| 前端类型与 `createDeviceAdapter` | `src/plugin-sdk/`                                   |
+| 页面用的再导出                   | `src/devices/`（首页继续从这里取列表）              |
+| Rust HID 实现                    | `src-tauri/src/devices/<name>.rs`（文件名用下划线） |
+| Rust 契约                        | `src-tauri/src/plugin_sdk.rs`                       |
+| Rust 注册表                      | `src-tauri/src/devices/mod.rs` 的 `PLUGINS`         |
 
 `manifest.json` 有四个字段：`id`、`name`、`description`、`category`。`category` 取 `mouse`、`keyboard`、`headset`，对应首页一级分类「鼠标 / 键盘 / 耳机」。前端 `import` 这个文件，Rust 用 `include_str!` 读同一个文件。不要在托盘、设置默认值或别的表里再写一份 id / 名称。不要恢复 `TRAY_DEVICES`，也不要在设置里写死 `vt9-air`。默认托盘设备是两张注册表的第一项，所以两张表的顺序要一致。
 
@@ -52,10 +52,10 @@
 
 加新设备时，先确认它用哪种通道，**不要默认套用某一只的写法**：
 
-| 形态 | 特征 | 例子 |
-| --- | --- | --- |
-| 被动中断读 | 设备自己周期性推报告 | 雷柏 VT9 AIR（Report `0xBB`） |
-| Feature 报告 | 描述符里**有 `B1` 项** | 雷蛇毒蝰（OpenRazer 协议） |
+| 形态                     | 特征                                        | 例子                                              |
+| ------------------------ | ------------------------------------------- | ------------------------------------------------- |
+| 被动中断读               | 设备自己周期性推报告                        | 雷柏 VT9 AIR（Report `0xBB`）                     |
+| Feature 报告             | 描述符里**有 `B1` 项**                      | 雷蛇毒蝰（OpenRazer 协议）                        |
 | Output 报文 + Input 读回 | 描述符里是 `81 00` + `91 00`，**没有 `B1`** | 迈从 A5 V3（`0x4D` 邮箱）、VGN S99（`0x1A` 邮箱） |
 
 **判据**：读设备报告描述符，看有没有 `B1`（Feature）项。没有 `B1` 却调用 `send_feature_report`，Windows 会返回 `0x1`（函数不正确），很容易误以为是设备被占用或命令写错。VGN S99 就踩过这个坑。
@@ -119,4 +119,5 @@ cargo test --lib
   ```
 
   这条是 `#[ignore]` 的实机测试，默认不跑（依赖硬件）。它会打印 `connected / percent / charging / detail`，并断言「有百分比时 ≤ 100；没百分比时必须是充电中」，防止把读取失败悄悄报成正常。
+
 - 探针复现协议用 `tools/hid-probe`：`hid-probe s9pro` 会发同一条 `0x4F/0x81` 查询并把每次读回的原始字节打出来。改协议时先用它看真实报文，再改进插件。

@@ -54,11 +54,9 @@ function emptySelection(): SelectedByCategory {
 }
 
 function keptDeviceId(id: string | null | undefined, category: DeviceCategory): string | null {
-  if (!id)
-    return null
+  if (!id) return null
   const device = getDeviceById(id)
-  if (!device || device.category !== category)
-    return null
+  if (!device || device.category !== category) return null
   return device.id
 }
 
@@ -77,11 +75,9 @@ export function resolveSelectedByCategory(
     headset: keptDeviceId(selected?.headset, 'headset'),
   }
   const active = getDeviceById(trayDeviceId)
-  if (active && next[active.category] == null)
-    next[active.category] = active.id
+  if (active && next[active.category] == null) next[active.category] = active.id
   return next
 }
-
 
 /** 规范化托盘分类多选：去重、只保留合法项、按鼠标→键盘→耳机排序；至少保留一项。 */
 export function normalizeTrayCategories(
@@ -89,18 +85,17 @@ export function normalizeTrayCategories(
 ): DeviceCategory[] {
   const order: DeviceCategory[] = ['mouse', 'keyboard', 'headset']
   const set = new Set(cats ?? [])
-  const next = order.filter(c => set.has(c))
+  const next = order.filter((c) => set.has(c))
   return next.length > 0 ? next : ['mouse']
 }
 
 /** 刷新间隔限制在 3～300 秒 */
 function clampInterval(n: number): number {
-  if (!Number.isFinite(n))
-    return DEFAULT_AUTO_INTERVAL_SEC
+  if (!Number.isFinite(n)) return DEFAULT_AUTO_INTERVAL_SEC
   return Math.min(300, Math.max(3, Math.round(n)))
 }
 
-export const useSettingsStore = create<SettingsState>(set => ({
+export const useSettingsStore = create<SettingsState>((set) => ({
   autoIntervalSec: DEFAULT_AUTO_INTERVAL_SEC,
   themeMode: DEFAULT_THEME_MODE,
   closeBehavior: DEFAULT_CLOSE_BEHAVIOR,
@@ -109,14 +104,13 @@ export const useSettingsStore = create<SettingsState>(set => ({
   trayCategories: DEFAULT_TRAY_CATEGORIES,
   launchAtLogin: DEFAULT_LAUNCH_AT_LOGIN,
   autoRefresh: true,
-  setAutoIntervalSec: sec => set({ autoIntervalSec: clampInterval(sec) }),
-  setThemeMode: themeMode => set({ themeMode }),
-  setCloseBehavior: closeBehavior => set({ closeBehavior }),
+  setAutoIntervalSec: (sec) => set({ autoIntervalSec: clampInterval(sec) }),
+  setThemeMode: (themeMode) => set({ themeMode }),
+  setCloseBehavior: (closeBehavior) => set({ closeBehavior }),
   setTrayDeviceId: (id) => {
     const device = getDeviceById(id)
-    if (!device)
-      return
-    set(state => ({
+    if (!device) return
+    set((state) => ({
       trayDeviceId: device.id,
       selectedByCategory: {
         ...state.selectedByCategory,
@@ -124,9 +118,9 @@ export const useSettingsStore = create<SettingsState>(set => ({
       },
     }))
   },
-  setTrayCategories: cats => set({ trayCategories: normalizeTrayCategories(cats) }),
-  setLaunchAtLogin: launchAtLogin => set({ launchAtLogin }),
-  setAutoRefresh: autoRefresh => set({ autoRefresh }),
+  setTrayCategories: (cats) => set({ trayCategories: normalizeTrayCategories(cats) }),
+  setLaunchAtLogin: (launchAtLogin) => set({ launchAtLogin }),
+  setAutoRefresh: (autoRefresh) => set({ autoRefresh }),
   reset: () =>
     set({
       autoIntervalSec: DEFAULT_AUTO_INTERVAL_SEC,
@@ -144,7 +138,9 @@ export const useSettingsStore = create<SettingsState>(set => ({
 export const settingsTauriStore = createTauriStore(
   'settings',
   // create() 返回 UseBoundStore；插件类型要 StoreApi + 字符串索引，故断言
-  useSettingsStore as unknown as import('zustand').StoreApi<SettingsState & Record<string, unknown>>,
+  useSettingsStore as unknown as import('zustand').StoreApi<
+    SettingsState & Record<string, unknown>
+  >,
   {
     autoStart: true,
     filterKeys: [
@@ -167,9 +163,8 @@ export const settingsTauriStore = createTauriStore(
 /** 根据主题模式切换 `html.dark` */
 export function applyThemeFromStore(themeMode?: ThemeMode) {
   const mode = themeMode ?? useSettingsStore.getState().themeMode
-  const dark
-    = mode === 'dark'
-      || (mode === 'system'
-        && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  const dark =
+    mode === 'dark' ||
+    (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.classList.toggle('dark', dark)
 }

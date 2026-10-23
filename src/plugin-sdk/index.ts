@@ -9,8 +9,7 @@ export { DEVICE_CATEGORIES, DEVICE_CATEGORY_LABEL } from './types'
 /** manifest.json 里的 category 是普通字符串，进适配器前收成已知分类。 */
 function parseDeviceCategory(value: string): DeviceCategory {
   for (const category of DEVICE_CATEGORIES) {
-    if (category === value)
-      return category
+    if (category === value) return category
   }
   throw new Error(`未知设备分类: ${value}`)
 }
@@ -35,8 +34,7 @@ export function createDeviceAdapter(meta: {
       try {
         const info = await invoke<BatteryInfo>('get_battery', { deviceId })
         return info.connected
-      }
-      catch {
+      } catch {
         return false
       }
     },

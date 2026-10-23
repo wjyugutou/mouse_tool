@@ -68,10 +68,9 @@ if (localTag.status === 0) {
   process.exit(1)
 }
 
-const remoteTag = git(
-  ['ls-remote', '--exit-code', '--tags', 'origin', `refs/tags/${tag}`],
-  { allowStatus: [2] },
-)
+const remoteTag = git(['ls-remote', '--exit-code', '--tags', 'origin', `refs/tags/${tag}`], {
+  allowStatus: [2],
+})
 if (remoteTag.status === 0) {
   console.error(`远端已有 tag ${tag}`)
   process.exit(1)
@@ -84,8 +83,7 @@ const synced = spawnSync(process.execPath, [join(root, 'scripts/sync-version.mjs
   cwd: root,
   stdio: 'inherit',
 })
-if ((synced.status ?? 1) !== 0)
-  process.exit(synced.status ?? 1)
+if ((synced.status ?? 1) !== 0) process.exit(synced.status ?? 1)
 
 git(['add', '--', ...versionFiles])
 git(['commit', '-m', `chore: 版本 bump 至 ${ver}`])

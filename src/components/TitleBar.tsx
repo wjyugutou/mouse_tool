@@ -11,14 +11,13 @@ const GITHUB_URL = 'https://github.com/wjyugutou/mouse_tool'
 
 export function TitleBar() {
   const navigate = useNavigate()
-  const pathname = useRouterState({ select: s => s.location.pathname })
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const [maximized, setMaximized] = useState(false)
 
   async function syncMaximized() {
     try {
       setMaximized(await getCurrentWindow().isMaximized())
-    }
-    catch {
+    } catch {
       /* browser preview */
     }
   }
@@ -31,13 +30,11 @@ export function TitleBar() {
       try {
         const win = getCurrentWindow()
         const next = await win.isMaximized()
-        if (!cancelled)
-          setMaximized(next)
+        if (!cancelled) setMaximized(next)
         unlisten = await win.onResized(() => {
           void syncMaximized()
         })
-      }
-      catch {
+      } catch {
         /* ignore */
       }
     })()
@@ -51,7 +48,9 @@ export function TitleBar() {
     void getCurrentWindow().minimize()
   }
   const toggleMaximize = () => {
-    void getCurrentWindow().toggleMaximize().then(() => syncMaximized())
+    void getCurrentWindow()
+      .toggleMaximize()
+      .then(() => syncMaximized())
   }
   const close = () => {
     void getCurrentWindow().close()
@@ -80,18 +79,13 @@ export function TitleBar() {
           title="设置"
           aria-label="设置"
           onClick={() => {
-            if (pathname !== '/settings')
-              void navigate({ to: '/settings' })
+            if (pathname !== '/settings') void navigate({ to: '/settings' })
           }}
         >
           <Icon icon="mdi:cog-outline" className="size-4" />
         </Button>
       </div>
-      <div
-        className="min-w-6 flex-1"
-        data-tauri-drag-region
-        onDoubleClick={toggleMaximize}
-      />
+      <div className="min-w-6 flex-1" data-tauri-drag-region onDoubleClick={toggleMaximize} />
       <div className="flex items-stretch">
         <button
           type="button"

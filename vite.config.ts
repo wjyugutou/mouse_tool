@@ -20,7 +20,7 @@ export default defineConfig(() => ({
       include: /\.[jt]sx?$/,
       presets: [reactCompilerPreset()],
     }),
-    
+
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,
