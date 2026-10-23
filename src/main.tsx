@@ -30,7 +30,8 @@ async function bootstrap(mount: HTMLElement) {
     await settingsTauriStore.start()
   } catch (error) {
     console.error('settings store start failed', error)
-  }
+  } 
+          
   applyThemeFromStore(useSettingsStore.getState().themeMode)
 
   createRoot(mount).render(
@@ -39,5 +40,6 @@ async function bootstrap(mount: HTMLElement) {
     </StrictMode>,
   )
 }
-
+  
 void bootstrap(rootEl)
+      
