@@ -42,7 +42,7 @@ export function DeviceList({
   useEffect(() => {
     if (activeCategory) {
       // 外部（托盘/设置）切换设备时同步分类，这是有意的 props → state 同步。
-      // eslint-disable-next-line react/set-state-in-effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCategory(activeCategory)
     }
   }, [activeCategory])
