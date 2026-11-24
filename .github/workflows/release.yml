@@ -58,6 +58,10 @@ jobs:
       - name: nsh build --release
         run: node scripts/nsh.mjs build --release
 
+      # windows-latest 镜像预装了 Inno Setup 6（runner 清单里写着 `InnoSetup 6.7.1`），
+      # 所以这里通常 0 秒通过、`choco install` 不执行；只有镜像哪天不再带它时才会走安装分支。
+      # nsh 在 PATH、ProgramFiles(x86)、ProgramFiles、LOCALAPPDATA 下找 ISCC.exe，
+      # 把 ISCC 所在目录写进 GITHUB_PATH 是为了让它能命中。
       - name: Ensure Inno Setup 6
         shell: pwsh
         run: |
@@ -69,6 +73,8 @@ jobs:
       - name: nsh package
         run: node scripts/nsh.mjs package --target windows --icon assets/icon.png -o ${{ env.OUT_DIR }}
 
+      # `nsh package` 自己就会调 ISCC 编安装包（产物名 `yugutou_tool-setup.exe`），
+      # 所以这里通常只是改名加上版本号；只有它没编出来时才在下面兜底跑一次 ISCC。
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
