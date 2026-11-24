@@ -1,6 +1,6 @@
 # NSH 版 vs Tauri 版功能对比
 
-对照代码：Tauri 版 `src/` + `src-tauri/`（**已从本分支删除**，可从提交 `aa6f6d5` 找回）；NSH 版 `nsh-app/`（分支 feature/refactor-NSH，2026-11-24 核对）。
+对照代码：Tauri 版 `src/` + `src-tauri/`（**已从本分支删除**，可从提交 `aa6f6d5` 找回）；NSH 版在仓库根目录（原 `nsh-app/`，已移到根目录；分支 feature/refactor-NSH，2026-11-24 核对）。
 
 **内存（托盘待机约 30 秒，进程树私有工作集 PrivWS 合计）：NSH 版 18.1 MB（1 个进程）vs Tauri 版 192.8 MB（7 个进程，含 msedgewebview2）。**
 测量：均为 release 构建；NSH 版为 `nsh package --target windows` 产物，Tauri 版为已安装的 `D:\YugutouTool`（PID 19412，只读测量）；PowerShell `Win32_Process` 按 ParentProcessId 递归取进程树，PrivWS 取自 `Win32_PerfFormattedData_PerfProc_Process.WorkingSetPrivate`。开窗时 NSH 18.2 MB，Tauri 179.2 MB（同时刻读数，Tauri 窗口状态未确认）。
@@ -119,7 +119,7 @@
 | 安装包 | MSI（WiX zh-CN，passive） | `nsh package` 出目录 + zip + `.iss` | ⚠️ | 安装器需 Inno Setup 6（本机未装），不出 MSI |
 | release.yml：tag → 构建 → Release → latest.json | tauri-action | 已删除旧 workflow，待按 NSH 重写 | ❌ | 本分支暂无 CI |
 | 版本号随 tag 同步 | package.json / tauri.conf（`scripts/sync-version.mjs`、`bump-version.mjs`） | `nsh.json`、`native/Cargo.toml` 未接；旧脚本已删 | ❌ | |
-| 应用图标 | ✅ | `--icon assets/icon.png`（从 `src-tauri/icons/icon.png` 搬到 `nsh-app/assets/`） | ✅ | |
+| 应用图标 | ✅ | `--icon assets/icon.png`（从 `src-tauri/icons/icon.png` 搬到 `assets/`） | ✅ | |
 
 ## MorphBot
 
@@ -156,6 +156,7 @@
 - [ ] P2 设置页分区与搜索
 - [ ] P2 侧栏品牌区 + MorphBot：重写或正式移除
 - [ ] P3 圆环填充 / 刷新图标的过渡动画（NSH `Animated` / Motion）
-- [x] 已删除 Tauri 旧代码（2026-11-24）：`src-tauri/`、`src/`（含 `vendor/morph-bot`、`bindings.ts`）、`index.html`、`vite.config.ts`、`tsconfig*.json`、`eslint.config.mjs`、`components.json`、`package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`、`node_modules/`、`dist/`、`.tanstack/`、`scripts/{sync-version,bump-version}.mjs`、`scripts/tauri-build.ps1`、`.github/workflows/release.yml`、`.cursor/rules/react-compiler.mdc`。设备 manifest 搬到 `nsh-app/native/manifests/`，应用图标搬到 `nsh-app/assets/icon.png`。全部可从提交 `aa6f6d5` 找回
+- [x] 已删除 Tauri 旧代码（2026-11-24）：`src-tauri/`、`src/`（含 `vendor/morph-bot`、`bindings.ts`）、`index.html`、`vite.config.ts`、`tsconfig*.json`、`eslint.config.mjs`、`components.json`、`package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`、`node_modules/`、`dist/`、`.tanstack/`、`scripts/{sync-version,bump-version}.mjs`、`scripts/tauri-build.ps1`、`.github/workflows/release.yml`、`.cursor/rules/react-compiler.mdc`。设备 manifest 搬到 `native/manifests/`，应用图标搬到 `assets/icon.png`。全部可从提交 `aa6f6d5` 找回
+- [x] `nsh-app/` 的内容移到仓库根目录（2026-11-24）：`App.tsx`、`app.test.tsx`、`nsh.json`、`theme.json`、`tsconfig.json`、`native/`、`src/`、`assets/`；`nsh-app/.gitignore` 并进根 `.gitignore`
 - [ ] P2 NSH 版的版本 bump 脚本（替代已删的 `bump-version.mjs`：改 nsh.json / Cargo.toml、提交、打 tag）
 - [ ] P3 清理临时目录 `D:\DEV\wwwwj\_nsh_probe`

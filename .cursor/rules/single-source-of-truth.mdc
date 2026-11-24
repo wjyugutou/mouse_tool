@@ -3,15 +3,15 @@ description: >-
   电量 / 设置必须单一数据源。改设置、托盘、电量采样（hub）、首页电量展示、
   或新增设置项 / 轮询时启用。
 globs:
-  - nsh-app/native/src/hub.rs
-  - nsh-app/native/src/settings.rs
-  - nsh-app/native/src/tray_icon.rs
-  - nsh-app/native/src/lib.rs
-  - nsh-app/src/store.ts
-  - nsh-app/src/Home.tsx
-  - nsh-app/src/BatteryCard.tsx
-  - nsh-app/src/SettingsPage.tsx
-  - nsh-app/App.tsx
+  - native/src/hub.rs
+  - native/src/settings.rs
+  - native/src/tray_icon.rs
+  - native/src/lib.rs
+  - src/store.ts
+  - src/Home.tsx
+  - src/BatteryCard.tsx
+  - src/SettingsPage.tsx
+  - App.tsx
 alwaysApply: false
 ---
 
@@ -21,13 +21,13 @@ Rust（`yugutou/native` 的 `Mouse`）是电量、设备和设置的唯一所有
 
 ## 设置（Settings）
 
-- **权威源**：`nsh-app/native/src/settings.rs`，落盘 `%APPDATA%\com.wwwj.mousetool\nsh\settings.json`。禁止另起 JSON / 注册表 / localStorage 存同一套设置。
+- **权威源**：`native/src/settings.rs`，落盘 `%APPDATA%\com.wwwj.mousetool\nsh\settings.json`。禁止另起 JSON / 注册表 / localStorage 存同一套设置。
 - TSX 只通过 `Mouse.settings()` 读、`Mouse.updateSettings()` / `Mouse.selectDevice()` 写，写完由 `store.ts` 的 `pull()` 取回快照。
 - 新增设置字段：Rust `Settings`、默认值、`SettingsPatch` 与 TSX 用到的地方对齐，默认值只在 Rust 定义。
 
 ## 电量（Battery）
 
-- **权威源**：`nsh-app/native/src/hub.rs`。同一设备的 HID 读取只走 hub；合并并发、缓存、设备世代都在 hub 内完成。
+- **权威源**：`native/src/hub.rs`。同一设备的 HID 读取只走 hub；合并并发、缓存、设备世代都在 hub 内完成。
 - 有效采样写进 hub 快照并递增 `Mouse.version()`；TSX `pull()` 看到版本变了才重取 `Mouse.samples()`，托盘图标 / 提示也从同一快照生成（`Mouse.trayIcon()` / `Mouse.trayTooltip()`）。
 - 手动刷新：`Mouse.read(id, true)`，仍回写 hub。
 

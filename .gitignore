@@ -2,10 +2,10 @@
 logs
 *.log
 
-# NSH 构建产物（nsh-app/.gitignore 里也有）
-nsh-app/.nsh/
-nsh-app/target/
-nsh-app/native/target/
+# NSH 构建产物（由 nsh check / build 重新生成）
+/.nsh/
+/target/
+/native/target/
 
 # Editor directories and files
 .vscode/*

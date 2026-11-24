@@ -28,10 +28,9 @@
 
 ## 🚀 开发与运行
 
-环境要求：Windows、Rust、`nsh` CLI（>=0.6.1, <0.7）。所有命令在 `nsh-app/` 下执行：
+环境要求：Windows、Rust、`nsh` CLI（>=0.6.1, <0.7）。所有命令在仓库根目录执行（NSH 应用就在根目录，原 `` 已移上来）：
 
 ```powershell
-cd nsh-app
 nsh run              # 开发运行
 nsh check            # 类型检查 TSX + 编译 Rust
 nsh test             # UI 测试（app.test.tsx）
@@ -41,12 +40,11 @@ cargo test --manifest-path native/Cargo.toml   # Rust 单元测试
 ## 📁 本地打包
 
 ```powershell
-cd nsh-app
 nsh build --release
 nsh package --target windows --icon assets/icon.png   # 产出目录、zip 与 Inno Setup 的 .iss
 ```
 
-版本号在 `nsh-app/nsh.json` 的 `version` 与 `nsh-app/native/Cargo.toml`。
+版本号在 `nsh.json` 的 `version` 与 `native/Cargo.toml`。
 
 ## 📦 下载安装
 
@@ -56,9 +54,9 @@ nsh package --target windows --icon assets/icon.png   # 产出目录、zip 与 I
 
 每款设备一个 Rust 文件，实现插件契约并在注册表追加一行；界面从注册表读取设备列表，无需改主窗口、设置页和托盘。
 
-- 契约：`nsh-app/native/src/plugin_sdk.rs`（`DevicePlugin` / `BatteryInfo`）
-- 实现：`nsh-app/native/src/devices/<id>.rs`，在 `devices/mod.rs` 的 `PLUGINS` 注册
-- 元数据：`nsh-app/native/manifests/<id>.json`（`include_str!` 编进二进制）
+- 契约：`native/src/plugin_sdk.rs`（`DevicePlugin` / `BatteryInfo`）
+- 实现：`native/src/devices/<id>.rs`，在 `devices/mod.rs` 的 `PLUGINS` 注册
+- 元数据：`native/manifests/<id>.json`（`include_str!` 编进二进制）
 
 详细说明请参阅 [设备插件开发指南](docs/plugin-development.md)。
 
@@ -74,12 +72,12 @@ nsh package --target windows --icon assets/icon.png   # 产出目录、zip 与 I
 
 ## 🏗️ 项目结构
 
-- `nsh-app/nsh.json` — 应用清单（窗口、主题、版本）
-- `nsh-app/App.tsx`、`nsh-app/src/` — TSX 界面（首页、设置、侧栏、标题栏、托盘状态）
-- `nsh-app/native/src/lib.rs` — 原生模块 `Mouse`（导出给 TSX 的接口）
-- `nsh-app/native/src/hub.rs` — 设备轮询与电量快照
-- `nsh-app/native/src/devices/` — 插件注册表与各设备 HID 实现
-- `nsh-app/native/src/settings.rs`、`autostart.rs`、`app_log.rs`、`tray_icon.rs` — 设置、开机自启、日志、托盘图标
+- `nsh.json` — 应用清单（窗口、主题、版本）
+- `App.tsx`、`src/` — TSX 界面（首页、设置、侧栏、标题栏、托盘状态）
+- `native/src/lib.rs` — 原生模块 `Mouse`（导出给 TSX 的接口）
+- `native/src/hub.rs` — 设备轮询与电量快照
+- `native/src/devices/` — 插件注册表与各设备 HID 实现
+- `native/src/settings.rs`、`autostart.rs`、`app_log.rs`、`tray_icon.rs` — 设置、开机自启、日志、托盘图标
 - `tools/hid-probe/` — 独立 HID 探针 crate（协议调试用，不参与应用构建）
 
 ## 📄 许可证

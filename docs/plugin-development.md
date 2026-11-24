@@ -14,12 +14,12 @@
 
 | 作用         | 路径                                                     |
 | ------------ | -------------------------------------------------------- |
-| 元数据（唯一来源） | `nsh-app/native/manifests/<id>.json`                 |
-| Rust HID 实现 | `nsh-app/native/src/devices/<name>.rs`（文件名用下划线） |
-| Rust 契约    | `nsh-app/native/src/plugin_sdk.rs`                       |
-| Rust 注册表  | `nsh-app/native/src/devices/mod.rs` 的 `PLUGINS`         |
-| TSX 接口     | `nsh-app/native/src/lib.rs` 的 `Mouse`（`yugutou/native`） |
-| TSX 界面     | `nsh-app/App.tsx`、`nsh-app/src/`                        |
+| 元数据（唯一来源） | `native/manifests/<id>.json`                 |
+| Rust HID 实现 | `native/src/devices/<name>.rs`（文件名用下划线） |
+| Rust 契约    | `native/src/plugin_sdk.rs`                       |
+| Rust 注册表  | `native/src/devices/mod.rs` 的 `PLUGINS`         |
+| TSX 接口     | `native/src/lib.rs` 的 `Mouse`（`yugutou/native`） |
+| TSX 界面     | `App.tsx`、`src/`                        |
 
 manifest 有四个字段：`id`、`name`、`description`、`category`。`category` 取 `mouse`、`keyboard`、`headset`，对应首页一级分类「鼠标 / 键盘 / 耳机」。Rust 用 `include_str!` 读它。不要在托盘、设置默认值、TSX 或别的表里再写一份 id / 名称。默认托盘设备是 `PLUGINS` 的第一项。
 
@@ -27,19 +27,19 @@ manifest 有四个字段：`id`、`name`、`description`、`category`。`categor
 
 现有五只：
 
-- `vt9-air`：中断读，模板是 `nsh-app/native/src/devices/vt9_air.rs`
-- `razer-viper-ultimate`：Feature 报告，模板是 `nsh-app/native/src/devices/razer_viper_ultimate.rs`
-- `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `nsh-app/native/src/devices/mchose_a5_v3_ultra.rs`
-- `vgn-s99`：**首只 `category: keyboard`**。接收器 `320F:5088` 的 `0xFF1C` 厂商接口走 Output 报文 + Input 中断读回（Report ID `0x04`，命令 `0x1A`），模板是 `nsh-app/native/src/devices/vgn_s99.rs`。它证明了一件事：**不是每只设备都能用 Feature 报告**。该接口描述符只有 `81 00`（Input）/ `91 00`（Output）、没有 `B1` 项，所以 `HidD_SetFeature` 恒返回 `0x1`
-- `qianxingzhe-s9-pro`：**前行者 S9 Pro**，VID `372E` 是 IPI/PIAO 的厂商号，走 `ms_pix_v1` 协议。接收器 `372E:103D` 的 `0xFF00` 厂商接口**有 `B1` 项**，所以能用 Feature 报告（Report ID `0x03`，payload 63 B）。命令 `get_basic_info`：`payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0...]`，`crc = sum(payload[1..]) % 256`；**电量 = 回包 `buf[6]`**。两个坑：①首次读回可能只有 5 字节状态桩 `03 50 02 00 02`，真回包要重读几次，读一次就放弃会和「设备不应答」完全一样；②充电时电量字段是哨兵值 `0xE4`(228)，官方配置器此时也只显示 228，谁都拿不到百分比。模板是 `nsh-app/native/src/devices/qianxingzhe_s9_pro.rs`。它证明了两件事：
+- `vt9-air`：中断读，模板是 `native/src/devices/vt9_air.rs`
+- `razer-viper-ultimate`：Feature 报告，模板是 `native/src/devices/razer_viper_ultimate.rs`
+- `mchose-a5-v3-ultra-plus`：迈从接收器 `3837:1018` 的 `0x4D` 输出/输入报文邮箱，模板是 `native/src/devices/mchose_a5_v3_ultra.rs`
+- `vgn-s99`：**首只 `category: keyboard`**。接收器 `320F:5088` 的 `0xFF1C` 厂商接口走 Output 报文 + Input 中断读回（Report ID `0x04`，命令 `0x1A`），模板是 `native/src/devices/vgn_s99.rs`。它证明了一件事：**不是每只设备都能用 Feature 报告**。该接口描述符只有 `81 00`（Input）/ `91 00`（Output）、没有 `B1` 项，所以 `HidD_SetFeature` 恒返回 `0x1`
+- `qianxingzhe-s9-pro`：**前行者 S9 Pro**，VID `372E` 是 IPI/PIAO 的厂商号，走 `ms_pix_v1` 协议。接收器 `372E:103D` 的 `0xFF00` 厂商接口**有 `B1` 项**，所以能用 Feature 报告（Report ID `0x03`，payload 63 B）。命令 `get_basic_info`：`payload = [crc, 0x50, 0x00, 0x02, 0x4F, 0x81, 0...]`，`crc = sum(payload[1..]) % 256`；**电量 = 回包 `buf[6]`**。两个坑：①首次读回可能只有 5 字节状态桩 `03 50 02 00 02`，真回包要重读几次，读一次就放弃会和「设备不应答」完全一样；②充电时电量字段是哨兵值 `0xE4`(228)，官方配置器此时也只显示 228，谁都拿不到百分比。模板是 `native/src/devices/qianxingzhe_s9_pro.rs`。它证明了两件事：
   - **VID 不等于品牌**：同一个 VID 下 IPI 系几只鼠标共用一套协议，`0x372E` 在某些表里还被标成 `bytech` / PIAO
   - **协议一样不等于该认领**：同厂的 IPI Float 88 / PIAO（PID `0x1014` / `0x1015` / `0x1028` / `0x1056`）也是 `ms_pix_v1`，但**不要**把它们加进本插件的 `PRODUCT_IDS`。否则插一只 IPI Float 88 会被「前行者 S9 Pro」认领，设备名全错，详情里的型号说明也是错的。插件名承诺支持谁，`PRODUCT_IDS` 就只收谁；同厂其它机型另开插件（如 `ipi-float-88`）。回归测试 `does_not_claim_other_ipi_models` 守着这条
   - 型号与 PID 对照见官方 `D:\EWEADN S9\config.xml`：S9 Pro 有线 `0x1029`；Ultra `0x1027`；Max `0x105E`；三者共用 2.4G 接收器 PID `1026` / `1033` / `103D` / `1055`。**所以 2.4G 接收器上认不出具体型号**，只标「S9 系列」，Ultra/Max 有线 PID 明确拒绝冒充 Pro
 
 ## 加一只设备（鼠标 / 键盘 / 耳机）
 
-1. 在 `nsh-app/native/manifests/` 加 `<id>.json`（`id` 用稳定的短横线，例如 `razer-viper-ultimate`；`category` 按设备类型填 `mouse` / `keyboard` / `headset`）。
-2. 在 `nsh-app/native/src/devices/` 加模块，文件名用下划线，`include_str!("../../manifests/<id>.json")`。普通鼠标参考 `vt9_air.rs`；已经确认必须用 Feature 报告、并且会在文件顶部写明 opt-in 的，参考 `razer_viper_ultimate.rs`。
+1. 在 `native/manifests/` 加 `<id>.json`（`id` 用稳定的短横线，例如 `razer-viper-ultimate`；`category` 按设备类型填 `mouse` / `keyboard` / `headset`）。
+2. 在 `native/src/devices/` 加模块，文件名用下划线，`include_str!("../../manifests/<id>.json")`。普通鼠标参考 `vt9_air.rs`；已经确认必须用 Feature 报告、并且会在文件顶部写明 opt-in 的，参考 `razer_viper_ultimate.rs`。
 3. 在 `devices/mod.rs` 声明 `mod`，并在 `PLUGINS` 加一行。界面通过 `Mouse.devices()` 自动拿到新设备，不要为了注册去改 TSX 页面。
 4. 接口不用新加。`Mouse.read(deviceId, fresh)` 已经按 `device_id` 分发。
 5. 注意 `devices/mod.rs` 的单元测试断言了 `PLUGINS` 前几项的顺序和分类。**新增设备后这条测试会红，必须同步改**，否则 `cargo test` 过不了。
@@ -70,7 +70,7 @@ manifest 有四个字段：`id`、`name`、`description`、`category`。`categor
 
 ## 怎么验证
 
-在 `nsh-app/` 下跑：
+在仓库根目录跑：
 
 ```powershell
 nsh check      # TSX 类型检查 + 编译 Rust
@@ -78,7 +78,7 @@ nsh test       # UI 测试（app.test.tsx）
 cargo test --manifest-path native/Cargo.toml
 ```
 
-动了首页电量卡片（`nsh-app/src/BatteryCard.tsx` / `status.ts`）时注意：状态文案的判断顺序直接决定用户看到什么。顺序写反过一次：先判 `percent == null` 再判 `charging`，导致 S9 Pro 充电时显示「等待电量数据」，用户以为读不到电量。改了顺序或文案，要在 `app.test.tsx` 补场景；新增「无电量但有语义」的状态（像 `unsupported`）也要补。
+动了首页电量卡片（`src/BatteryCard.tsx` / `status.ts`）时注意：状态文案的判断顺序直接决定用户看到什么。顺序写反过一次：先判 `percent == null` 再判 `charging`，导致 S9 Pro 充电时显示「等待电量数据」，用户以为读不到电量。改了顺序或文案，要在 `app.test.tsx` 补场景；新增「无电量但有语义」的状态（像 `unsupported`）也要补。
 
 解析器要有 Rust 单元测试，不要只靠插上鼠标才知道包格式对不对。
 
@@ -92,7 +92,7 @@ cargo test --manifest-path native/Cargo.toml
 - 前行者 S9 Pro：插上 `372E:103D` 接收器，选中「前行者 S9 Pro」后应出现百分比，说明里会写 `Feature 0x03/0x4F · n%`。充电时插线只能显示「正在充电，此状态拿不到百分比」（厂商哨兵值 `0xE4`，官方软件同样拿不到）。**不能只跑探针验收**，要跑插件自己的读取路径：
 
   ```bash
-  cd nsh-app/native
+  cd native
   cargo test --lib s9_pro_reads_real_hardware -- --ignored --nocapture
   ```
 
