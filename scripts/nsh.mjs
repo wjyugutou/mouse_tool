@@ -3,6 +3,8 @@
  * 仓库内的 nsh：`node scripts/nsh.mjs <args>`，等同于执行 `nsh <args>`。
  * nsh 版本只写在 package.json 的 `nshVersion`（CI 也走本脚本）。
  * `.tools/nsh/bin/nsh(.exe)` 不存在，或 `--version` 与 `nshVersion` 不符时，用官方安装脚本装到 `.tools/nsh`。
+ * 安装脚本从 GitHub Release 直接取（和 nsh.dev 发的是同一份），跳过 nsh.dev 那一跳；
+ * 整个安装限时 `NSH_INSTALL_TIMEOUT_MS`（默认 60s），网络卡住时直接失败，不会无限挂着。
  * 官方脚本没有「不改用户 PATH」的选项：Windows 上装完会把用户 PATH 恢复成安装前的值。
  */
 import { spawnSync, spawn } from 'node:child_process'
@@ -22,6 +24,11 @@ if (!/^v\d+\.\d+\.\d+$/.test(wanted ?? '')) {
   process.exit(1)
 }
 
+// 官方安装脚本直接取 GitHub Release 上的资产，跳过 nsh.dev 那一跳。
+const releaseBase = `https://github.com/longbridge/nsh/releases/download/${wanted}`
+// 安装（下载 + 解压）的总时限；网络卡住时到点失败，而不是一直等。
+const installTimeoutMs = Number(process.env.NSH_INSTALL_TIMEOUT_MS) || 120_000
+
 /** `nsh 0.6.1 (2f51d86)` → `v0.6.1`；没装或跑不起来返回 null。 */
 function installedVersion() {
   if (!existsSync(exe)) return null
@@ -31,27 +38,40 @@ function installedVersion() {
 }
 
 function install() {
-  console.error(`[nsh.mjs] 安装 nsh ${wanted} 到 ${installDir}`)
+  console.error(`[nsh.mjs] 安装 nsh ${wanted} 到 ${installDir}（超时 ${installTimeoutMs / 1000}s）`)
   const env = { ...process.env, NSH_VERSION: wanted, NSH_INSTALL_DIR: installDir }
   // 从 PowerShell 7 里调起时，继承的 PSModulePath 指向 pwsh 的模块，Windows PowerShell 5.1 会找不到 Get-FileHash 等命令。
   if (isWin) delete env.PSModulePath
   const r = isWin
     ? spawnSync(
-        'powershell',
-        [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          // 官方脚本会把 bin 追加到用户 PATH；这里装完把用户 PATH 恢复原样，只用仓库内的路径。
-          "$before = [Environment]::GetEnvironmentVariable('Path', 'User'); " +
-            'try { irm https://nsh.dev/install.ps1 | iex } finally { ' +
-            "if ([Environment]::GetEnvironmentVariable('Path', 'User') -ne $before) { " +
-            "[Environment]::SetEnvironmentVariable('Path', $before, 'User') } }",
-        ],
-        { stdio: 'inherit', env },
-      )
-    : spawnSync('sh', ['-c', 'curl -fsSL https://nsh.dev/install.sh | sh'], { stdio: 'inherit', env })
+      'powershell',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        // 官方脚本会把 bin 追加到用户 PATH；这里装完把用户 PATH 恢复原样，只用仓库内的路径。
+        "$before = [Environment]::GetEnvironmentVariable('Path', 'User'); " +
+        `try { irm ${releaseBase}/install.ps1 | iex } finally { ` +
+        "if ([Environment]::GetEnvironmentVariable('Path', 'User') -ne $before) { " +
+        "[Environment]::SetEnvironmentVariable('Path', $before, 'User') } }",
+      ],
+      { stdio: 'inherit', env, timeout: installTimeoutMs, killSignal: 'SIGKILL' },
+    )
+    : spawnSync('sh', ['-c', `curl -fsSL ${releaseBase}/install.sh | sh`], {
+      stdio: 'inherit',
+      env,
+      timeout: installTimeoutMs,
+      killSignal: 'SIGKILL',
+    })
+  if (r.error?.code === 'ETIMEDOUT') {
+    console.error(
+      `[nsh.mjs] 安装超时（${installTimeoutMs / 1000}s）：没能从 ${releaseBase} 装好 nsh。\n` +
+      '       检查代理是否对 GitHub 生效（HTTP_PROXY / 系统代理），' +
+      '或用 NSH_INSTALL_TIMEOUT_MS 放宽后重试。',
+    )
+    process.exit(1)
+  }
   if ((r.status ?? 1) !== 0) {
     console.error('[nsh.mjs] 安装失败')
     process.exit(r.status ?? 1)

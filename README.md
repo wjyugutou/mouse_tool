@@ -28,7 +28,9 @@
 
 ## 🚀 开发与运行
 
-环境要求：Windows、Node.js、Rust；pnpm 可选。**不需要全局安装 nsh**：`nsh` 是独立的命令行工具（不是 Cargo 依赖），版本写在 `package.json` 的 `nshVersion`（当前 v0.6.1，CI 读同一处）。首次运行任一 `pnpm` 脚本时，`scripts/nsh.mjs` 用官方安装脚本把它下载到仓库内的 `.tools/nsh`（已 gitignore），版本不符时自动重装，并保持用户 PATH 不变。
+环境要求：Windows、Node.js、Rust；pnpm 可选。**不需要全局安装 nsh**：`nsh` 是独立的命令行工具（不是 Cargo 依赖），版本写在 `package.json` 的 `nshVersion`（当前 v0.6.1，CI 读同一处）。首次运行任一 `pnpm` 脚本时，`scripts/nsh.mjs` 从 GitHub Release 取官方安装脚本，把它装到仓库内的 `.tools/nsh`（已 gitignore），版本不符时自动重装，并保持用户 PATH 不变。
+
+安装限时 60 秒（`NSH_INSTALL_TIMEOUT_MS` 可放宽），超时会直接失败而不是一直挂着。要下的 zip 约 81 MB，网速慢时用 `$env:NSH_INSTALL_TIMEOUT_MS = 900000` 再跑；代理只对系统代理（IE 设置）生效——PowerShell 5.1 的 `irm` 不读 `HTTP_PROXY` 环境变量，GitHub 拉不动时先确认 Clash 开着「系统代理」。
 
 所有命令在仓库根目录执行：
 
@@ -46,7 +48,7 @@ pnpm build      # nsh build --release
 pnpm package    # nsh package --target windows --icon assets/icon.png
 ```
 
-产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou-tool-<版本>-windows-x86_64.zip` 和 Inno Setup 脚本 `yugutou_tool.iss`。装了 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 时同时出 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。
+产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou_tool-<版本>-windows-x86_64.zip` 和 Inno Setup 脚本 `yugutou_tool.iss`。装了 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 时同时出 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。注意 `pnpm build` 只出 `.nsh/out/` 里的 `bundle.js` / `bundle.nshc` / `app.json`，要可运行的程序目录和 zip 得跑 `pnpm package`。
 
 `package.json` 只放脚本、没有依赖，`pnpm install` 不需要跑；没有 pnpm 时直接 `node scripts/<脚本>.mjs` 也一样。
 
