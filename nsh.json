@@ -1,8 +1,8 @@
 {
   "name": "yugutou_tool",
   "id": "com.wwwj.mousetool",
-  "version": "4.0.0",
-  "build": 2,
+  "version": "4.1.0",
+  "build": 3,
   "nsh": ">=0.6.1, <0.7",
   "rust": "native",
   "singleInstance": true,
