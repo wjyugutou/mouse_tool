@@ -47,7 +47,7 @@ const FEATURE_WAIT: Duration = Duration::from_micros(59_900);
 const RETRY_PAUSE: Duration = Duration::from_millis(10);
 const ATTEMPTS: u8 = 5;
 
-const MANIFEST_JSON: &str = include_str!("../../../../src/plugins/razer-viper-ultimate/manifest.json");
+const MANIFEST_JSON: &str = include_str!("../../manifests/razer-viper-ultimate.json");
 
 pub static PLUGIN: DevicePlugin = DevicePlugin {
     manifest_json: MANIFEST_JSON,

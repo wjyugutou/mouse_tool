@@ -14,7 +14,7 @@ const REPORT_BC: u8 = 0xBC;
 /// 官方软件挂起中断读时，设备约每 3 秒推一次 BB；我们最多等这么久。
 const LISTEN_FOR: Duration = Duration::from_millis(4500);
 
-const MANIFEST_JSON: &str = include_str!("../../../../src/plugins/vt9-air/manifest.json");
+const MANIFEST_JSON: &str = include_str!("../../manifests/vt9-air.json");
 
 pub static PLUGIN: DevicePlugin = DevicePlugin {
     manifest_json: MANIFEST_JSON,

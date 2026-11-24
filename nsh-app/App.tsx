@@ -2,7 +2,7 @@
  * 入口：Rust 起采样线程；这里只管窗口、托盘和两张页面。
  * Rust 每次出新电量把版本号加一，TSX 每秒看一眼版本号，变了才取快照、重画托盘。
  */
-import { effect, mount, setColorScheme, View } from "nsh";
+import { colorScheme, effect, mount, setColorScheme, View } from "nsh";
 import { Application, currentWindow, Tray } from "nsh/desktop";
 import { Mouse } from "yugutou/native";
 import { Home } from "./src/Home";
@@ -59,7 +59,16 @@ function App() {
   if (!Mouse.launchedAtLogin()) showMain();
 
   return (
-    <View class="flex-1 bg-background">
+    <View
+      class="flex-1 bg-background"
+      style={{
+        // 老版：深蓝黑底（--background）+ 右上 primary/10 大光晕。
+        backgroundImage:
+          colorScheme() === "dark"
+            ? "radial-gradient(circle at 92% 6%, rgba(60, 143, 244, 0.16) 0%, rgba(60, 143, 244, 0) 48%)"
+            : "radial-gradient(circle at 92% 6%, rgba(29, 78, 216, 0.08) 0%, rgba(29, 78, 216, 0) 48%)",
+      }}
+    >
       <TitleBar />
       <If when={page() === "home"} else={<SettingsPage />}>
         <Home />

@@ -6,11 +6,12 @@
   "nsh": ">=0.6.1, <0.7",
   "rust": "native",
   "singleInstance": true,
+  "theme": "theme.json",
   "window": {
     "title": "yugutou_tool",
     "defaultSize": { "width": 1200, "height": 850 },
     "minSize": { "width": 760, "height": 560 },
-    "titleBar": { "style": "hidden", "height": 40 },
+    "titleBar": { "style": "hidden", "height": 36 },
     "closeOnPress": false,
     "defaultVisible": false
   }

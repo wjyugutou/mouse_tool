@@ -128,7 +128,7 @@ const READ_GAP: Duration = Duration::from_millis(50);
 /// 整个设备的读取加锁，避免首页和托盘同时打开同一个 HID 句柄。
 static READ_LOCK: Mutex<()> = Mutex::new(());
 
-const MANIFEST_JSON: &str = include_str!("../../../../src/plugins/qianxingzhe-s9-pro/manifest.json");
+const MANIFEST_JSON: &str = include_str!("../../manifests/qianxingzhe-s9-pro.json");
 
 pub static PLUGIN: DevicePlugin = DevicePlugin {
     manifest_json: MANIFEST_JSON,

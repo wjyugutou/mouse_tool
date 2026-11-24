@@ -1,4 +1,4 @@
-/** 电量卡片的文案与档位，从 Tauri 版 `src/components/BatteryCard.tsx` 迁来，规则不变。 */
+/** 电量卡片的文案、档位与配色，从 Tauri 版 `src/components/BatteryCard.tsx` 迁来，规则不变。 */
 import type { Battery } from "yugutou/native";
 
 export type BatteryLevel = "high" | "mid" | "low" | "unknown" | "empty" | "charging" | "unsupported";
@@ -13,14 +13,12 @@ export const LEVEL_LABEL: Record<BatteryLevel, string> = {
   unsupported: "型号不支持",
 };
 
-export const LEVEL_BAR: Record<BatteryLevel, string> = {
-  high: "bg-emerald-500",
-  mid: "bg-amber-500",
-  low: "bg-red-500",
-  unknown: "bg-muted-foreground",
-  empty: "bg-border",
-  charging: "bg-sky-500",
-  unsupported: "bg-muted-foreground",
+/** 圆环填充色（Tailwind 的 *-500 / 深色下 *-400），与老版 LEVEL_STROKE 对应。 */
+export const LEVEL_STROKE: Record<"high" | "mid" | "low" | "charging", { light: string; dark: string; rgb: string }> = {
+  high: { light: "#10b981", dark: "#34d399", rgb: "16, 185, 129" },
+  mid: { light: "#f59e0b", dark: "#fbbf24", rgb: "245, 158, 11" },
+  low: { light: "#ef4444", dark: "#f87171", rgb: "239, 68, 68" },
+  charging: { light: "#0ea5e9", dark: "#38bdf8", rgb: "14, 165, 233" },
 };
 
 export function levelFromInfo(info: Battery | null): BatteryLevel {
@@ -65,6 +63,26 @@ export function hintText(info: Battery | null, loading: boolean, error: string |
   if (info.percent == null) return "接收器已连接，等待鼠标唤醒。动一下鼠标或重新插拔接收器。";
   if (info.percent <= 15) return "建议尽快充电。";
   return auto ? "自动刷新已开启，电量会按间隔更新。" : "自动刷新已暂停，可随时手动刷新。";
+}
+
+export function connectionText(info: Battery | null, error: string | null): string {
+  if (!info && !error) return "检测中";
+  return info?.connected ? "已连接" : "未连接";
+}
+
+export function chargingText(info: Battery | null): string {
+  if (info?.charging == null) return "—";
+  return info.charging ? "充电中" : "未充电";
+}
+
+/** 2.4G 接收器 PID 被同系列多型号共用时，标题的型号可能不准。 */
+export function modelUncertainText(info: Battery | null): string | null {
+  if (!info || !info.connected || !info.modelUncertain) return null;
+  return "型号按 S9 系列处理";
+}
+
+export function truncate(value: string, max = 120): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
 export function clockText(atMs: number | null): string {

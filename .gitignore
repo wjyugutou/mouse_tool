@@ -1,16 +1,11 @@
 # Logs
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# NSH 构建产物（nsh-app/.gitignore 里也有）
+nsh-app/.nsh/
+nsh-app/target/
+nsh-app/native/target/
 
 # Editor directories and files
 .vscode/*
@@ -18,23 +13,15 @@ dist-ssr
 .idea
 .DS_Store
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
 *.sw?
 
-# Updater signing keys (never commit)
+# 签名密钥（nsh keygen 等），勿提交
 *.key
-*.key.pub
-
-# local updater signing
+*.secret
 .env.local
-*.key
-!*.key.pub
-
 mouse_tool_updater_keys
 
-# HID 探针工具（tools/hid-probe/）：独立 crate，不参与 tauri build。
+# HID 探针工具（tools/hid-probe/）：独立 crate，不参与应用构建。
 # 源码可以留，但下面两类产物不入库：解包的厂商驱动源码与 Rust 编译产物。
 tools/hid-probe/vgn-asar/
 tools/hid-probe/target/

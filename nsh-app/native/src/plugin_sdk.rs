@@ -67,7 +67,7 @@ impl BatteryInfo {
 
 /// 编译期注册的一只鼠标。
 pub struct DevicePlugin {
-    /// `include_str!` 进来的 manifest，与前端插件目录是同一个文件。
+    /// `include_str!` 进来的 manifest（`native/manifests/<id>.json`），设备元数据只写这一处。
     pub manifest_json: &'static str,
     /// 读取电量。默认只做中断读。
     /// Feature 报告只允许模块文档写明 opt-in 的插件使用（雷蛇）。

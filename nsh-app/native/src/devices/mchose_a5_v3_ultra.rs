@@ -53,7 +53,7 @@ const RETRY_GAP: Duration = Duration::from_millis(80);
 static READ_LOCK: Mutex<()> = Mutex::new(());
 
 const MANIFEST_JSON: &str =
-    include_str!("../../../../src/plugins/mchose-a5-v3-ultra-plus/manifest.json");
+    include_str!("../../manifests/mchose-a5-v3-ultra-plus.json");
 
 pub static PLUGIN: DevicePlugin = DevicePlugin {
     manifest_json: MANIFEST_JSON,

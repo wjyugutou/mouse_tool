@@ -83,7 +83,7 @@ const RETRY_GAP: Duration = Duration::from_millis(120);
 /// 串行化 HID 访问：托盘和首页可能同时触发 `get_battery`。
 static READ_LOCK: Mutex<()> = Mutex::new(());
 
-const MANIFEST_JSON: &str = include_str!("../../../../src/plugins/vgn-s99/manifest.json");
+const MANIFEST_JSON: &str = include_str!("../../manifests/vgn-s99.json");
 
 pub static PLUGIN: DevicePlugin = DevicePlugin {
     manifest_json: MANIFEST_JSON,
