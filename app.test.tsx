@@ -34,3 +34,11 @@ test("标题栏图标按钮切到设置页再回首页", async () => {
   await app.press("label:首页");
   expect(app.texts()).toContain("当前设备");
 });
+
+test("设置页：检查更新（开发运行不连网，只给提示）", async () => {
+  const app = await open("./App.tsx", { width: 1200, height: 850 });
+  await app.press("label:设置");
+  expect(app.texts()).toContain("应用更新");
+  await app.press("text:检查更新");
+  expect(app.texts()).toContain("开发运行不检查更新，打包安装后才可用");
+});

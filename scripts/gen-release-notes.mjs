@@ -5,6 +5,7 @@
  *   node scripts/gen-release-notes.mjs              # 打到 stdout
  *   node scripts/gen-release-notes.mjs --write PATH # 写入文件
  *   node scripts/gen-release-notes.mjs --from v3.4.0 --to HEAD
+ *   node scripts/gen-release-notes.mjs --tag v3.6.0   # 还没打 tag 时，对比链接用这个名字
  *
  * 若存在 docs/release-notes.override.md 且非空，优先用该文件（人工润色）。
  */
@@ -29,10 +30,12 @@ const args = process.argv.slice(2)
 let writePath = null
 let from = null
 let to = 'HEAD'
+let tagName = null
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--write') writePath = args[++i]
   else if (args[i] === '--from') from = args[++i]
   else if (args[i] === '--to') to = args[++i]
+  else if (args[i] === '--tag') tagName = args[++i]
 }
 
 const overridePath = join(root, 'docs/release-notes.override.md')
@@ -133,7 +136,7 @@ const repo = (() => {
   }
 })()
 
-const toTag = (() => {
+const toTag = tagName ?? (() => {
   try {
     if (to === 'HEAD') return git(['describe', '--tags', '--exact-match', 'HEAD'])
   } catch {
@@ -145,7 +148,7 @@ const toTag = (() => {
 if (from.startsWith('v') || from.length < 40) {
   const right = toTag.startsWith('v') ? toTag : `v${toTag}`
   const left = from.startsWith('v') ? from : from
-  if (right.startsWith('v')) {
+  if (right.startsWith('v') && right !== 'vHEAD') {
     lines.push(`**Full Changelog**: https://github.com/${repo}/compare/${left}...${right}`, ``)
   }
 }

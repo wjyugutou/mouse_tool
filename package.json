@@ -1,0 +1,16 @@
+{
+  "name": "yugutou_tool",
+  "private": true,
+  "type": "module",
+  "description": "只放脚本，不装依赖；版本号以 nsh.json 为准",
+  "scripts": {
+    "dev": "nsh run",
+    "check": "nsh check",
+    "test": "nsh test",
+    "build": "nsh build --release",
+    "package": "nsh package --target windows --icon assets/icon.png",
+    "version:sync": "node scripts/sync-version.mjs",
+    "release:bump": "node scripts/bump-version.mjs",
+    "release:notes": "node scripts/gen-release-notes.mjs"
+  }
+}

@@ -1,0 +1,128 @@
+name: Release
+
+# pnpm release:bump <version> 推送 tag v<version> 后触发：
+# 检查 → 测试 → 打包 → Inno Setup 安装包 → 签名的 latest.json → GitHub Release。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NSH_VERSION: v0.6.1 # 与 nsh.json 的 "nsh": ">=0.6.1, <0.7" 对齐；升级 NSH 时一起改
+  OUT_DIR: .nsh/release
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node（只跑 scripts/*.mjs，不装依赖）
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: native -> ../target
+
+      - name: Install nsh CLI
+        shell: pwsh
+        run: |
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$env:LOCALAPPDATA\nsh\bin\nsh.exe" --version
+
+      - name: Check version matches tag
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          node scripts/sync-version.mjs --check "$VER"
+
+      - name: nsh check
+        run: nsh check
+
+      - name: nsh test
+        run: nsh test
+
+      - name: nsh build --release
+        run: nsh build --release
+
+      - name: Ensure Inno Setup 6
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          Split-Path $iscc | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: nsh package
+        run: nsh package --target windows --icon assets/icon.png -o ${{ env.OUT_DIR }}
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $out = $env:OUT_DIR
+          $setup = Join-Path $out 'yugutou_tool-setup.exe'
+          if (-not (Test-Path $setup)) { ISCC.exe /Q (Join-Path $out 'yugutou_tool.iss') }
+          if (-not (Test-Path $setup)) { throw "installer not built: $setup" }
+          Move-Item $setup (Join-Path $out "yugutou_tool-$env:VER-setup.exe") -Force
+          Get-ChildItem $out | Format-Table Name, Length
+
+      - name: Release notes
+        shell: bash
+        run: |
+          FILE="docs/releases/v${VER}.md"
+          if [[ ! -f "$FILE" ]]; then
+            node scripts/gen-release-notes.mjs --to "$GITHUB_REF_NAME" --tag "$GITHUB_REF_NAME" --write "$FILE"
+          fi
+          cp "$FILE" "$OUT_DIR/notes.md"
+
+      - name: Update manifest (latest.json + latest.json.sig)
+        shell: pwsh
+        env:
+          NSH_UPDATE_KEY: ${{ secrets.NSH_UPDATE_KEY }}
+        run: |
+          if (-not $env:NSH_UPDATE_KEY) { throw 'secret NSH_UPDATE_KEY is not set' }
+          $key = Join-Path $env:RUNNER_TEMP 'update.secret'
+          [IO.File]::WriteAllText($key, $env:NSH_UPDATE_KEY.Trim() + "`n")
+          try {
+            $archive = Get-ChildItem $env:OUT_DIR -Filter "*-$env:VER-windows-x86_64.zip" | Select-Object -First 1
+            if (-not $archive) { throw "update archive for $env:VER not found" }
+            nsh update-manifest $archive.FullName --notes (Join-Path $env:OUT_DIR 'notes.md') --key $key -o $env:OUT_DIR
+            if ($LASTEXITCODE -ne 0) { throw 'nsh update-manifest failed' }
+          } finally {
+            Remove-Item $key -Force -ErrorAction SilentlyContinue
+          }
+          Get-Content (Join-Path $env:OUT_DIR 'latest.json')
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd "$OUT_DIR"
+          ASSETS=(yugutou_tool-"$VER"-setup.exe *-"$VER"-windows-x86_64.zip latest.json latest.json.sig)
+          shopt -s nullglob
+          for f in notes.*.md; do ASSETS+=("$f"); done
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --draft=false --prerelease=false --latest
+          else
+            gh release create "$GITHUB_REF_NAME" "${ASSETS[@]}" \
+              --title "yugutou_tool v$VER" --notes-file notes.md --latest
+          fi

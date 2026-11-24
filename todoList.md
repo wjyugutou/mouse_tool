@@ -56,7 +56,7 @@
 | 版本号、GitHub 链接 | ✅ | 版本在设置页，GitHub 在标题栏 | ✅ | |
 | 日志路径、打开日志目录 | ✅ | ✅ | ✅ | |
 | 设置文件路径 | 无 | ✅ | ✅ | NSH 新增 |
-| 检查更新 | ✅ | 无 | ❌ | 见自动更新 |
+| 检查更新 | ✅ | 设置页「应用更新」：检查、下载并安装、进度与说明 | ⚠️ | 未实测（需先发一版带 latest.json 的 Release） |
 
 ## 托盘
 
@@ -109,16 +109,16 @@
 
 | 功能 | Tauri 版 | NSH 版 | 状态 | 备注 |
 |---|---|---|---|---|
-| 检查、下载、安装、重启 | tauri-plugin-updater + GitHub latest.json（minisign） | 未接入 `nsh/updater` | ❌ | 签名体系不兼容，需 `nsh keygen` |
-| 老 Tauri 用户升级到 NSH 版 | — | 无 | ❌ | 需手动安装或用最后一版 Tauri 引导 |
+| 检查、下载、安装、重启 | tauri-plugin-updater + GitHub latest.json（minisign） | `nsh/updater`（`src/updater.ts`）：启动 15 秒后 + 每 6 小时自动检查，设置页手动检查，托盘「安装更新」；`nsh.json` `updater.github` + `publicKey`（Ed25519） | ⚠️ | 代码与测试已过，端到端未实测 |
+| 老 Tauri 用户升级到 NSH 版 | — | 不支持 | ❌ | 两边都读 `releases/latest/download/latest.json`，但格式和签名（minisign vs Ed25519）都不同：老版检查会报错，不能应用内升级，只能手动装 NSH 安装包；老 MSI 装在别的目录，需手动卸载 |
 
 ## 打包发版
 
 | 功能 | Tauri 版 | NSH 版 | 状态 | 备注 |
 |---|---|---|---|---|
-| 安装包 | MSI（WiX zh-CN，passive） | `nsh package` 出目录 + zip + `.iss` | ⚠️ | 安装器需 Inno Setup 6（本机未装），不出 MSI |
-| release.yml：tag → 构建 → Release → latest.json | tauri-action | 已删除旧 workflow，待按 NSH 重写 | ❌ | 本分支暂无 CI |
-| 版本号随 tag 同步 | package.json / tauri.conf（`scripts/sync-version.mjs`、`bump-version.mjs`） | `nsh.json`、`native/Cargo.toml` 未接；旧脚本已删 | ❌ | |
+| 安装包 | MSI（WiX zh-CN，passive） | `nsh package` 出目录 + zip + `.iss`，CI 里 Inno Setup 编出 `yugutou_tool-<版本>-setup.exe`（按用户安装，可被更新覆盖） | ⚠️ | 本机未装 Inno Setup，安装包只在 CI 出；不出 MSI |
+| release.yml：tag → 构建 → Release → latest.json | tauri-action | `.github/workflows/release.yml`：装 nsh → check/test/build → package → Inno Setup → `nsh update-manifest` 签名 → `gh release create` | ⚠️ | actionlint 通过，未在 GitHub 上跑过；需 secret `NSH_UPDATE_KEY` |
+| 版本号随 tag 同步 | package.json / tauri.conf（`scripts/sync-version.mjs`、`bump-version.mjs`） | `pnpm release:bump <版本>`：`scripts/bump-version.mjs` + `sync-version.mjs` 改 nsh.json（build + 1）/ Cargo.toml / Cargo.lock，提交、打 tag、推送；CI 校验版本与 tag 一致 | ✅ | `--dry-run` 已验证 |
 | 应用图标 | ✅ | `--icon assets/icon.png`（从 `src-tauri/icons/icon.png` 搬到 `assets/`） | ✅ | |
 
 ## MorphBot
@@ -147,9 +147,11 @@
 - [ ] P0 目视确认托盘图标（颜色、1–3 格）和 tooltip
 - [ ] P0 定托盘鼠标交互（沿用「单击菜单、双击开窗」或保留 NSH 现状）
 - [ ] P0 实测开机自启开关、`--autostart` 只进托盘、主题切换
-- [ ] P1 接入 `nsh/updater`：生成密钥、`nsh update-manifest` 出 latest.json、设置页「检查更新」
-- [ ] P1 新建 `.github/workflows/release.yml`（旧 tauri-action 版已删）：`nsh package --target windows --icon assets/icon.png` + Inno Setup 出安装包，版本号随 tag 写入 nsh.json / Cargo.toml；`scripts/gen-release-notes.mjs` 仍可用来生成发版说明
-- [ ] P1 定老 Tauri 用户的迁移路径（安装位置、卸载旧 MSI、更新通道切换）
+- [x] P1 接入 `nsh/updater`（2026-11-24）：公钥写进 `nsh.json`，私钥在仓库外；设置页「应用更新」+ 自动检查
+- [x] P1 新建 `.github/workflows/release.yml`（2026-11-24）：nsh package + Inno Setup + 签名 latest.json + GitHub Release
+- [ ] P1 老 Tauri 用户没法应用内升级到 NSH 版（清单格式与签名不兼容，老版检查更新会报错）：发版说明 / README 写明手动下载安装包并卸载旧 MSI；可选再发最后一版 Tauri，检查更新时引导到下载页
+- [ ] P0 首次真实发版走通：在 GitHub 添加 secret `NSH_UPDATE_KEY`，`pnpm release:bump` 一版，确认 Release 资产（setup.exe、更新 zip、latest.json、latest.json.sig），再用上一版实测应用内更新
+- [ ] P1 签名私钥备份：`D:\DEV\wwwwj\_nsh_probe\keys\yugutou-update.secret` 丢了就再也发不了已装用户能验签的更新
 - [ ] P1 启动时修正 Run 路径 + 自启诊断面板
 - [ ] P1 设置页「恢复默认」
 - [ ] P2 自动刷新间隔支持自定义数值
@@ -158,5 +160,5 @@
 - [ ] P3 圆环填充 / 刷新图标的过渡动画（NSH `Animated` / Motion）
 - [x] 已删除 Tauri 旧代码（2026-11-24）：`src-tauri/`、`src/`（含 `vendor/morph-bot`、`bindings.ts`）、`index.html`、`vite.config.ts`、`tsconfig*.json`、`eslint.config.mjs`、`components.json`、`package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`、`node_modules/`、`dist/`、`.tanstack/`、`scripts/{sync-version,bump-version}.mjs`、`scripts/tauri-build.ps1`、`.github/workflows/release.yml`、`.cursor/rules/react-compiler.mdc`。设备 manifest 搬到 `native/manifests/`，应用图标搬到 `assets/icon.png`。全部可从提交 `aa6f6d5` 找回
 - [x] `nsh-app/` 的内容移到仓库根目录（2026-11-24）：`App.tsx`、`app.test.tsx`、`nsh.json`、`theme.json`、`tsconfig.json`、`native/`、`src/`、`assets/`；`nsh-app/.gitignore` 并进根 `.gitignore`
-- [ ] P2 NSH 版的版本 bump 脚本（替代已删的 `bump-version.mjs`：改 nsh.json / Cargo.toml、提交、打 tag）
-- [ ] P3 清理临时目录 `D:\DEV\wwwwj\_nsh_probe`
+- [x] P2 NSH 版的版本 bump 脚本（2026-11-24）：`pnpm release:bump <版本> [--dry-run]`
+- [ ] P3 清理临时目录 `D:\DEV\wwwwj\_nsh_probe`（先把 `keys/` 里的更新签名私钥挪到安全位置）

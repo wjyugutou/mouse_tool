@@ -3,6 +3,7 @@ import { Scroll, signal, Text, View, type JSX } from "nsh";
 import { Mouse } from "yugutou/native";
 import { Chip } from "./Chip";
 import { CATEGORIES, CATEGORY_LABEL, pull, settings } from "./store";
+import { check, install, isBusy, message, phase, progress, update } from "./updater";
 
 const INTERVALS = [3, 5, 10, 30, 60, 120, 300];
 
@@ -128,6 +129,28 @@ export function SettingsPage() {
 
         <Section title="关于">
           <Text class="text-xs text-muted-foreground">{`版本 ${Mouse.appVersion()}（NSH 原生版）`}</Text>
+        </Section>
+
+        <Section title="应用更新" hint="从 GitHub Releases 检查新版本；启动后和每 6 小时也会自动检查一次。">
+          <View class="flex-row gap-2">
+            <Chip label={phase() === "checking" ? "检查中…" : "检查更新"} disabled={isBusy()} onPress={() => void check(true)} />
+            {update() ? (
+              <Chip
+                label={`下载并安装 ${update()?.version ?? ""}`}
+                selected
+                disabled={isBusy()}
+                onPress={() => void install()}
+              />
+            ) : null}
+          </View>
+          {message() ? (
+            <Text class={phase() === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+              {phase() === "downloading" && progress() != null
+                ? `${message()} ${Math.round((progress() ?? 0) * 100)}%`
+                : message()}
+            </Text>
+          ) : null}
+          {update()?.notes ? <Text class="text-xs text-muted-foreground">{update()?.notes ?? ""}</Text> : null}
         </Section>
       </View>
     </Scroll>

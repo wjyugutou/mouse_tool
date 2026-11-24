@@ -9,10 +9,12 @@ import { Home } from "./src/Home";
 import { SettingsPage } from "./src/SettingsPage";
 import { page, pull, samples, settings } from "./src/store";
 import { TitleBar } from "./src/TitleBar";
+import { install as installUpdate, startAutoCheck, update } from "./src/updater";
 
 Mouse.start();
 pull();
 setInterval(pull, 1000);
+startAutoCheck();
 
 function App() {
   const win = currentWindow();
@@ -36,6 +38,7 @@ function App() {
   effect(() => {
     samples();
     settings();
+    const found = update();
     Tray.set({
       icon: Mouse.trayIcon(),
       tooltip: Mouse.trayTooltip(),
@@ -49,6 +52,18 @@ function App() {
             showMain();
           },
         },
+        ...(found
+          ? [
+              {
+                label: `安装更新 ${found.version}`,
+                onSelect: () => {
+                  page.set("settings");
+                  showMain();
+                  void installUpdate();
+                },
+              },
+            ]
+          : []),
         { type: "separator" },
         { label: "退出", onSelect: () => Application.quit() },
       ],

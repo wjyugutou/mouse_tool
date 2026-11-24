@@ -7,6 +7,10 @@
   "rust": "native",
   "singleInstance": true,
   "theme": "theme.json",
+  "updater": {
+    "github": "wjyugutou/mouse_tool",
+    "publicKey": "CBb2SU0semAuAE71TViq+J9MOVKu4e+NIWpAgTuyqEA="
+  },
   "window": {
     "title": "yugutou_tool",
     "defaultSize": { "width": 1200, "height": 850 },
