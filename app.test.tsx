@@ -19,11 +19,18 @@ test("首页：侧栏 Tabs、设备列表和居中的电量卡片", async () => 
 
 test("分类 Tabs 只列该类设备", async () => {
   const app = await open("./App.tsx", { width: 1200, height: 850 });
+  // 侧栏条目带 accessibilityLabel（设备名）；电量卡里的「当前设备」是正文文本，不在此列，
+  // 所以用 count 数侧栏条目，而不是 texts() 看整屏——后者会把当前设备也算进来。
   await app.press("label:键盘");
-  expect(app.texts()).toContain("VGN S99");
-  expect(app.texts()).not.toContain("VT9 AIR");
+  expect(app.count("label:VGN S99")).toBe(1);
+  expect(app.count("label:VT9 AIR")).toBe(0);
   await app.press("label:耳机");
   expect(app.texts()).toContain("暂无耳机");
+  expect(app.count("label:VGN S99")).toBe(0);
+  // 首次 HID 读取完成后 pull() 会换掉设置快照；等过这一刻，用户选的 Tab 不能被顶回去。
+  await app.wait(1200);
+  expect(app.texts()).toContain("暂无耳机");
+  expect(app.count("label:VT9 AIR")).toBe(0);
 });
 
 test("标题栏图标按钮切到设置页再回首页", async () => {

@@ -81,8 +81,14 @@ export function Sidebar(props: { activeId: string; onSelect: (id: string) => voi
   const activeCategory = (): Category => (deviceById(props.activeId)?.category as Category) ?? "mouse";
   const category = signal<Category>(untracked(activeCategory));
   // 托盘 / 设置里换了设备时，侧栏跟着切到对应分类。
+  // 只在分类**真的变了**时切：`pull()` 每秒把设置快照换成新对象，
+  // 无条件 `set` 会把用户刚点的 Tab 顶回当前设备的分类。
+  let followed = untracked(activeCategory);
   effect(() => {
-    category.set(activeCategory());
+    const next = activeCategory();
+    if (next === followed) return;
+    followed = next;
+    category.set(next);
   });
   const visible = () => devicesIn(category());
   const selectedId = () =>
