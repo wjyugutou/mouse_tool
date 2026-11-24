@@ -1,9 +1,0 @@
-import * as React from 'react'
-import { cn } from '@/lib/utils'
-import css from './style.module.css'
-
-function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
-  return <input type={type} data-slot="input" className={cn(css.input, className)} {...props} />
-}
-
-export { Input }
