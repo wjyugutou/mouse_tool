@@ -32,5 +32,5 @@ description: >-
 
 在仓库根目录：
 
-- 必跑：`nsh check`、`nsh test`
+- 必跑：`pnpm check`、`pnpm test`（或 `node scripts/nsh.mjs check|test`；不要假设全局 PATH 里有 nsh）
 - 改了 Rust 再跑：`cargo test --manifest-path native/Cargo.toml`

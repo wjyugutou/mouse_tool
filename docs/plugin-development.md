@@ -73,8 +73,8 @@ manifest 有四个字段：`id`、`name`、`description`、`category`。`categor
 在仓库根目录跑：
 
 ```powershell
-nsh check      # TSX 类型检查 + 编译 Rust
-nsh test       # UI 测试（app.test.tsx）
+pnpm check     # TSX 类型检查 + 编译 Rust（nsh 由 scripts/nsh.mjs 自动装到 .tools/nsh）
+pnpm test      # Rust 单元测试 + UI 测试（app.test.tsx）
 cargo test --manifest-path native/Cargo.toml
 ```
 

@@ -151,7 +151,7 @@
 - [x] P1 新建 `.github/workflows/release.yml`（2026-11-24）：nsh package + Inno Setup + 签名 latest.json + GitHub Release
 - [ ] P1 老 Tauri 用户没法应用内升级到 NSH 版（清单格式与签名不兼容，老版检查更新会报错）：发版说明 / README 写明手动下载安装包并卸载旧 MSI；可选再发最后一版 Tauri，检查更新时引导到下载页
 - [ ] P0 首次真实发版走通：在 GitHub 添加 secret `NSH_UPDATE_KEY`，`pnpm release:bump` 一版，确认 Release 资产（setup.exe、更新 zip、latest.json、latest.json.sig），再用上一版实测应用内更新
-- [ ] P1 签名私钥备份：`D:\DEV\wwwwj\_nsh_probe\keys\yugutou-update.secret` 丢了就再也发不了已装用户能验签的更新
+- [ ] P1 签名私钥再做一份离线备份：现位于 `D:\DEV\keys\yugutou\yugutou-update.secret`（仓库外），丢了就再也发不了已装用户能验签的更新
 - [ ] P1 启动时修正 Run 路径 + 自启诊断面板
 - [ ] P1 设置页「恢复默认」
 - [ ] P2 自动刷新间隔支持自定义数值
@@ -161,4 +161,5 @@
 - [x] 已删除 Tauri 旧代码（2026-11-24）：`src-tauri/`、`src/`（含 `vendor/morph-bot`、`bindings.ts`）、`index.html`、`vite.config.ts`、`tsconfig*.json`、`eslint.config.mjs`、`components.json`、`package.json` / `pnpm-lock.yaml` / `pnpm-workspace.yaml`、`node_modules/`、`dist/`、`.tanstack/`、`scripts/{sync-version,bump-version}.mjs`、`scripts/tauri-build.ps1`、`.github/workflows/release.yml`、`.cursor/rules/react-compiler.mdc`。设备 manifest 搬到 `native/manifests/`，应用图标搬到 `assets/icon.png`。全部可从提交 `aa6f6d5` 找回
 - [x] `nsh-app/` 的内容移到仓库根目录（2026-11-24）：`App.tsx`、`app.test.tsx`、`nsh.json`、`theme.json`、`tsconfig.json`、`native/`、`src/`、`assets/`；`nsh-app/.gitignore` 并进根 `.gitignore`
 - [x] P2 NSH 版的版本 bump 脚本（2026-11-24）：`pnpm release:bump <版本> [--dry-run]`
-- [ ] P3 清理临时目录 `D:\DEV\wwwwj\_nsh_probe`（先把 `keys/` 里的更新签名私钥挪到安全位置）
+- [x] 清理临时目录（2026-11-24）：nsh CLI 正式装到 `D:\DEV\tools\nsh`（v0.6.1，`bin` 已加进用户 PATH），签名密钥搬到 `D:\DEV\keys\yugutou\`，旧的探针目录已删除
+- [x] 仓库内定位 nsh（2026-11-24）：`scripts/nsh.mjs` 按 `package.json` 的 `nshVersion` 自动装到 `.tools/nsh`，pnpm 脚本和 CI 都走它，不依赖全局 PATH（全局的 `D:\DEV\tools\nsh` 保留但不再需要）

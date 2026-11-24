@@ -7,6 +7,9 @@ logs
 /target/
 /native/target/
 
+# scripts/nsh.mjs 自动安装的 nsh CLI
+/.tools/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

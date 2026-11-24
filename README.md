@@ -28,13 +28,15 @@
 
 ## 🚀 开发与运行
 
-环境要求：Windows、Rust、`nsh` CLI（>=0.6.1, <0.7）。所有命令在仓库根目录执行（NSH 应用就在根目录，原 `` 已移上来）：
+环境要求：Windows、Node.js、Rust；pnpm 可选。**不需要全局安装 nsh**：`nsh` 是独立的命令行工具（不是 Cargo 依赖），版本写在 `package.json` 的 `nshVersion`（当前 v0.6.1，CI 读同一处）。首次运行任一 `pnpm` 脚本时，`scripts/nsh.mjs` 用官方安装脚本把它下载到仓库内的 `.tools/nsh`（已 gitignore），版本不符时自动重装，并保持用户 PATH 不变。
+
+所有命令在仓库根目录执行：
 
 ```powershell
-nsh run              # 开发运行
-nsh check            # 类型检查 TSX + 编译 Rust
-nsh test             # UI 测试（app.test.tsx）
-cargo test --manifest-path native/Cargo.toml   # Rust 单元测试
+pnpm dev             # nsh run，开发运行
+pnpm check           # 类型检查 TSX + 编译 Rust
+pnpm test            # Rust 单元测试 + UI 测试（app.test.tsx）
+node scripts/nsh.mjs <args>   # 直接用 nsh 的其它命令，例如 node scripts/nsh.mjs --version
 ```
 
 ## 📁 本地打包
@@ -60,7 +62,7 @@ pnpm package    # nsh package --target windows --icon assets/icon.png
 
 | 名称 | 内容 |
 | --- | --- |
-| `NSH_UPDATE_KEY` | `nsh keygen` 生成的 `.secret` 文件的全部内容（签名 `latest.json`） |
+| `NSH_UPDATE_KEY` | `nsh keygen` 生成的 `.secret` 文件的全部内容（签名 `latest.json`）；本机放在仓库外的 `D:\DEV\keys\yugutou\yugutou-update.secret` |
 
 `GITHUB_TOKEN` 由 Actions 自动提供，不用添加。签名私钥不入库（`.gitignore` 忽略 `*.secret`），公钥写在 `nsh.json` 的 `updater.publicKey`；换密钥要同时改这两处，且旧版本只认旧公钥。
 
