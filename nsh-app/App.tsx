@@ -1,0 +1,71 @@
+/**
+ * 入口：Rust 起采样线程；这里只管窗口、托盘和两张页面。
+ * Rust 每次出新电量把版本号加一，TSX 每秒看一眼版本号，变了才取快照、重画托盘。
+ */
+import { effect, mount, setColorScheme, View } from "nsh";
+import { Application, currentWindow, Tray } from "nsh/desktop";
+import { Mouse } from "yugutou/native";
+import { Home } from "./src/Home";
+import { SettingsPage } from "./src/SettingsPage";
+import { page, pull, samples, settings } from "./src/store";
+import { TitleBar } from "./src/TitleBar";
+
+Mouse.start();
+pull();
+setInterval(pull, 1000);
+
+function App() {
+  const win = currentWindow();
+
+  function showMain() {
+    win.show();
+    win.focus();
+  }
+
+  win.on("closePress", () => {
+    if (settings().closeBehavior === "quit") Application.quit();
+    else win.hide();
+  });
+
+  effect(() => {
+    const mode = settings().themeMode;
+    setColorScheme(mode === "light" || mode === "dark" ? mode : "system");
+  });
+
+  // 托盘：电量或设置变了才重设（signal 只在版本号变化时换新值）。
+  effect(() => {
+    samples();
+    settings();
+    Tray.set({
+      icon: Mouse.trayIcon(),
+      tooltip: Mouse.trayTooltip(),
+      onClick: showMain,
+      menu: [
+        { label: "打开主界面", onSelect: showMain },
+        {
+          label: "设置",
+          onSelect: () => {
+            page.set("settings");
+            showMain();
+          },
+        },
+        { type: "separator" },
+        { label: "退出", onSelect: () => Application.quit() },
+      ],
+    });
+  });
+
+  // `--autostart` 开机启动只进托盘。
+  if (!Mouse.launchedAtLogin()) showMain();
+
+  return (
+    <View class="flex-1 bg-background">
+      <TitleBar />
+      <If when={page() === "home"} else={<SettingsPage />}>
+        <Home />
+      </If>
+    </View>
+  );
+}
+
+mount(App);

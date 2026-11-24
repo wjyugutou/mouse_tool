@@ -1,0 +1,17 @@
+{
+  "name": "yugutou_tool",
+  "id": "com.wwwj.mousetool",
+  "version": "3.5.0",
+  "build": 1,
+  "nsh": ">=0.6.1, <0.7",
+  "rust": "native",
+  "singleInstance": true,
+  "window": {
+    "title": "yugutou_tool",
+    "defaultSize": { "width": 1200, "height": 850 },
+    "minSize": { "width": 760, "height": 560 },
+    "titleBar": { "style": "hidden", "height": 40 },
+    "closeOnPress": false,
+    "defaultVisible": false
+  }
+}
