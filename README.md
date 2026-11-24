@@ -48,7 +48,7 @@ pnpm build      # nsh build --release
 pnpm package    # nsh package --target windows --icon assets/icon.png
 ```
 
-产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou_tool-<版本>-windows-x86_64.zip` 和 Inno Setup 脚本 `yugutou_tool.iss`。装了 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 时同时出 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。注意 `pnpm build` 只出 `.nsh/out/` 里的 `bundle.js` / `bundle.nshc` / `app.json`，要可运行的程序目录和 zip 得跑 `pnpm package`。
+产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou-tool-<版本>-windows-x86_64.zip`（nsh 归档名里应用名用连字符）和 Inno Setup 脚本 `yugutou_tool.iss`。装了 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 时同时出 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。注意 `pnpm build` 只出 `.nsh/out/` 里的 `bundle.js` / `bundle.nshc` / `app.json`，要可运行的程序目录和 zip 得跑 `pnpm package`。
 
 `package.json` 只放脚本、没有依赖，`pnpm install` 不需要跑；没有 pnpm 时直接 `node scripts/<脚本>.mjs` 也一样。
 
