@@ -8,7 +8,7 @@
 
 仓库：[wjyugutou/mouse_tool](https://github.com/wjyugutou/mouse_tool)
 
-![UI](./docs/ui_home_final.png)
+![UI](./docs/ui_home.png)
 
 ## ✨ 核心特性
 
