@@ -2,6 +2,7 @@
 import {
   Canvas,
   cleanup,
+  colorScheme,
   effect,
   lifecycle,
   reduceMotion,
@@ -300,6 +301,8 @@ export function MorphBot(props: MorphBotProps) {
     engine.stopSequence();
   }
 
+  const dark = () => colorScheme() === "dark";
+
   return (
     <View
       ref={(node) => {
@@ -316,8 +319,26 @@ export function MorphBot(props: MorphBotProps) {
         syncHoverState();
       }}
       onPress={triggerInteraction}
-      class="cursor-pointer relative shrink-0 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10"
-      style={{ width: boxSize(), height: boxSize() }}
+      tooltip="点一下互动"
+      class="cursor-pointer relative shrink-0 items-center justify-center rounded-[18px]"
+      style={{
+        width: boxSize(),
+        height: boxSize(),
+        borderCurve: "continuous",
+        borderWidth: 1,
+        borderColor: dark() ? "rgba(255, 255, 255, 0.10)" : "rgba(15, 23, 42, 0.09)",
+        backgroundColor: dark() ? "rgba(10, 14, 22, 0.65)" : "rgba(255, 255, 255, 0.92)",
+        backgroundImage: dark()
+          ? "radial-gradient(circle at 50% 20%, rgba(125, 211, 252, 0.16) 0%, rgba(125, 211, 252, 0) 70%)"
+          : "radial-gradient(circle at 50% 20%, rgba(37, 99, 235, 0.10) 0%, rgba(37, 99, 235, 0) 70%)",
+        boxShadow: dark()
+          ? "inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -6px 14px rgba(0, 0, 0, 0.45), 0 8px 20px -10px rgba(0, 0, 0, 0.7)"
+          : "inset 0 1px 0 rgba(255, 255, 255, 1), 0 6px 16px -8px rgba(15, 23, 42, 0.16)",
+      }}
+      hoverStyle={{
+        borderColor: dark() ? "rgba(125, 211, 252, 0.34)" : "rgba(37, 99, 235, 0.28)",
+      }}
+      activeStyle={{ scale: 0.96 }}
     >
       <Canvas class="absolute inset-0" draw={draw} />
     </View>

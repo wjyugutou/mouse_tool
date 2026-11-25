@@ -1,4 +1,4 @@
-/** 电量卡片的文案、档位与配色，从 Tauri 版 `src/components/BatteryCard.tsx` 迁来，规则不变。 */
+/** 电量卡片的文案、档位与精密能量光谱配色；业务判断规则保持单一真源语义。 */
 import type { Battery } from "yugutou/native";
 
 export type BatteryLevel = "high" | "mid" | "low" | "unknown" | "empty" | "charging" | "unsupported";
@@ -13,13 +13,71 @@ export const LEVEL_LABEL: Record<BatteryLevel, string> = {
   unsupported: "型号不支持",
 };
 
-/** 圆环填充色（Tailwind 的 *-500 / 深色下 *-400），与老版 LEVEL_STROKE 对应。 */
-export const LEVEL_STROKE: Record<"high" | "mid" | "low" | "charging", { light: string; dark: string; rgb: string }> = {
-  high: { light: "#10b981", dark: "#34d399", rgb: "16, 185, 129" },
-  mid: { light: "#f59e0b", dark: "#fbbf24", rgb: "245, 158, 11" },
-  low: { light: "#ef4444", dark: "#f87171", rgb: "239, 68, 68" },
-  charging: { light: "#0ea5e9", dark: "#38bdf8", rgb: "14, 165, 233" },
+/** 有效电量档位的圆环起止渐变色与发光基色。 */
+export const LEVEL_STROKE: Record<
+  "high" | "mid" | "low" | "charging",
+  { light: string; lightEnd: string; dark: string; darkEnd: string; rgb: string }
+> = {
+  high: { light: "#059669", lightEnd: "#34d399", dark: "#10b981", darkEnd: "#6ee7b7", rgb: "16, 185, 129" },
+  mid: { light: "#d97706", lightEnd: "#fbbf24", dark: "#f59e0b", darkEnd: "#fcd34d", rgb: "245, 158, 11" },
+  low: { light: "#e11d48", lightEnd: "#fb7185", dark: "#f43f5e", darkEnd: "#fda4af", rgb: "244, 63, 94" },
+  charging: { light: "#0284c7", lightEnd: "#38bdf8", dark: "#0ea5e9", darkEnd: "#7dd3fc", rgb: "56, 189, 248" },
 };
+
+export interface LevelPalette {
+  /** 语义主色（文本、图标、刻度点亮）。 */
+  accent: string;
+  /** 渐变弧尾端高光色。 */
+  accentEnd: string;
+  /** RGB 三元组（环境光晕与微透材质）。 */
+  rgb: string;
+  /** 胶囊/微标柔和背景。 */
+  softBg: string;
+  /** 胶囊/微标柔和边框。 */
+  softBorder: string;
+}
+
+/** 根据电量档位与深浅色返回整套协调色板，供环境光、仪表环、侧栏徽标与能量格共用。 */
+export function levelPalette(level: BatteryLevel, dark: boolean): LevelPalette {
+  if (level === "high" || level === "mid" || level === "low" || level === "charging") {
+    const tone = LEVEL_STROKE[level];
+    return {
+      accent: dark ? tone.darkEnd : tone.light,
+      accentEnd: dark ? tone.dark : tone.lightEnd,
+      rgb: tone.rgb,
+      softBg: `rgba(${tone.rgb}, ${dark ? 0.14 : 0.1})`,
+      softBorder: `rgba(${tone.rgb}, ${dark ? 0.3 : 0.24})`,
+    };
+  }
+  if (level === "unsupported") {
+    const rgb = "245, 158, 11";
+    return {
+      accent: dark ? "#fbbf24" : "#b45309",
+      accentEnd: dark ? "#f59e0b" : "#d97706",
+      rgb,
+      softBg: `rgba(${rgb}, ${dark ? 0.12 : 0.09})`,
+      softBorder: `rgba(${rgb}, ${dark ? 0.26 : 0.22})`,
+    };
+  }
+  if (level === "unknown") {
+    const rgb = dark ? "125, 211, 252" : "37, 99, 235";
+    return {
+      accent: dark ? "#93c5fd" : "#2563eb",
+      accentEnd: dark ? "#60a5fa" : "#3b82f6",
+      rgb,
+      softBg: `rgba(${rgb}, ${dark ? 0.12 : 0.08})`,
+      softBorder: `rgba(${rgb}, ${dark ? 0.24 : 0.18})`,
+    };
+  }
+  const rgb = dark ? "148, 163, 184" : "100, 116, 139";
+  return {
+    accent: dark ? "#94a3b8" : "#64748b",
+    accentEnd: dark ? "#64748b" : "#94a3b8",
+    rgb,
+    softBg: `rgba(${rgb}, ${dark ? 0.12 : 0.09})`,
+    softBorder: `rgba(${rgb}, ${dark ? 0.2 : 0.18})`,
+  };
+}
 
 export function levelFromInfo(info: Battery | null): BatteryLevel {
   if (!info) return "unknown";
@@ -34,9 +92,14 @@ export function levelFromInfo(info: Battery | null): BatteryLevel {
   return "high";
 }
 
+export function percentNumber(info: Battery | null): number | null {
+  if (!info || !info.connected || info.percent == null) return null;
+  return Math.max(0, Math.min(100, Math.round(info.percent)));
+}
+
 export function percentText(info: Battery | null): string {
-  if (!info || !info.connected || info.percent == null) return "--";
-  return `${Math.max(0, Math.min(100, Math.round(info.percent)))}%`;
+  const n = percentNumber(info);
+  return n == null ? "--" : `${n}%`;
 }
 
 export function statusText(info: Battery | null, loading: boolean, error: string | null): string {

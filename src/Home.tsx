@@ -1,4 +1,4 @@
-/** 首页：左侧设备侧栏，右侧居中的电量 hero 卡。电量来自 Rust 同一次采样，不自己再读 HID。 */
+/** 首页：左侧外设控制坞，右侧居中主控仪表台。电量来自 Rust 同一次采样，不自己再读 HID。 */
 import { Scroll, signal, View } from "nsh";
 import { Mouse } from "yugutou/native";
 import { BatteryCard } from "./BatteryCard";
@@ -46,7 +46,7 @@ export function Home() {
         loading={loading()}
         error={error()}
       />
-      <Scroll class="flex-1" contentClass="grow items-center justify-center px-10 py-8">
+      <Scroll class="flex-1" contentClass="grow items-center justify-center px-8 py-7">
         <BatteryCard
           deviceName={device()?.name ?? "尚未注册任何设备"}
           info={info()}
