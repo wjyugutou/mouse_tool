@@ -74,7 +74,7 @@ jobs:
         run: node scripts/nsh.mjs package --target windows --icon assets/icon.png -o ${{ env.OUT_DIR }}
 
       # nsh 不写安装包语言，找到 ISCC 时会先编出英文安装包。
-      # installer-zh 给 .iss 加上简体中文并覆盖编译，然后再加上版本号改名。
+      # 预装的 Inno Setup 6 没有 ChineseSimplified.isl，installer-zh 改用仓库里的译文并覆盖编译。
       - name: Build installer (Inno Setup, 简体中文)
         shell: pwsh
         run: |

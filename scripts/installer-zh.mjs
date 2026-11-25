@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * 把 nsh 写出的 Inno Setup 脚本改成简体中文，并在有 ISCC.exe 时重新编译安装包。
- * nsh package 不写 [Languages]，安装向导默认英文；Inno Setup 6.5+ 自带 ChineseSimplified.isl。
+ * nsh package 不写 [Languages]，安装向导默认英文。
+ * GitHub Actions 预装的 Inno Setup 6 不带简体中文，所以引用仓库里的
+ * `scripts/inno/ChineseSimplified.isl`（Inno Setup 6.5+ 译文，Zhenghan Yang）。
  * nsh 找到 ISCC 时会先编出英文安装包，所以本脚本在它之后跑，改脚本并覆盖编译。
  *
  * 用法:
@@ -16,17 +18,20 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-const LANG_BLOCK = `[Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\\ChineseSimplified.isl"
-`
+const MESSAGES_LINE = /^Name:\s*"chinesesimplified";\s*MessagesFile:\s*".*"\s*$/m
 
-/** 在 [Setup] 前插入简体中文。已经插过则原样返回。 */
-export function patchIss(text) {
-  if (text.includes('ChineseSimplified.isl')) return text
+function languageLine(messagesFile) {
+  return `Name: "chinesesimplified"; MessagesFile: "${messagesFile.replaceAll('"', '""')}"`
+}
+
+/** 在 [Setup] 前插入简体中文，或把已有的 MessagesFile 改成 `messagesFile`。 */
+export function patchIss(text, messagesFile) {
+  const line = languageLine(messagesFile)
+  if (MESSAGES_LINE.test(text)) return text.replace(MESSAGES_LINE, line)
   const at = text.indexOf('[Setup]')
   if (at < 0) throw new Error('iss 里没有 [Setup]')
   const gap = at > 0 && !text.slice(0, at).endsWith('\n') ? '\n' : ''
-  return `${text.slice(0, at)}${gap}${LANG_BLOCK}\n${text.slice(at)}`
+  return `${text.slice(0, at)}${gap}[Languages]\n${line}\n${text.slice(at)}`
 }
 
 function outputBase(text) {
@@ -78,9 +83,11 @@ function main() {
   const outArg = args.find((arg) => !arg.startsWith('--'))
   const outDir = outArg ? (isAbsolute(outArg) ? outArg : join(root, outArg)) : join(root, '.nsh', 'out')
   if (!existsSync(outDir)) throw new Error(`没有输出目录 ${outDir}，先跑 nsh package`)
+  const messagesFile = join(root, 'scripts', 'inno', 'ChineseSimplified.isl')
+  if (!existsSync(messagesFile)) throw new Error(`缺少简体中文语言文件 ${messagesFile}`)
   const iss = findIss(outDir)
   const original = readFileSync(iss, 'utf8')
-  const patched = patchIss(original)
+  const patched = patchIss(original, messagesFile)
   if (patched !== original) writeFileSync(iss, patched)
   console.log(`${iss}: 简体中文`)
 
