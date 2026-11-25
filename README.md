@@ -48,14 +48,14 @@ pnpm build      # nsh build --release
 pnpm package    # nsh package --target windows --icon assets/icon.png
 ```
 
-产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou-tool-<版本>-windows-x86_64.zip`（nsh 归档名里应用名用连字符）和 Inno Setup 脚本 `yugutou_tool.iss`。装了 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 时同时出 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。注意 `pnpm build` 只出 `.nsh/out/` 里的 `bundle.js` / `bundle.nshc` / `app.json`，要可运行的程序目录和 zip 得跑 `pnpm package`。
+产物在 `.nsh/out/`：程序目录、zip、更新用的 `yugutou-tool-<版本>-windows-x86_64.zip`（nsh 归档名里应用名用连字符）和 Inno Setup 脚本 `yugutou_tool.iss`。`pnpm package` 会给脚本加上简体中文；装了 [Inno Setup 6.5+](https://jrsoftware.org/isinfo.php) 时再编出中文安装向导的 `yugutou_tool-setup.exe`（按用户安装到 `%LOCALAPPDATA%\Programs\yugutou_tool`，不需要管理员，应用内更新才能覆盖安装目录）。注意 `pnpm build` 只出 `.nsh/out/` 里的 `bundle.js` / `bundle.nshc` / `app.json`，要可运行的程序目录和 zip 得跑 `pnpm package`。
 
 `package.json` 只放脚本、没有依赖，`pnpm install` 不需要跑；没有 pnpm 时直接 `node scripts/<脚本>.mjs` 也一样。
 
 ## 🚢 发版与自动更新
 
 1. `pnpm release:bump 3.6.0`（先加 `--dry-run` 看会改什么）：工作区要干净；改 `nsh.json`（version，build + 1）、`native/Cargo.toml`、`native/Cargo.lock`，生成 `docs/releases/v3.6.0.md`，提交 `chore: 版本 bump 至 3.6.0`，打 tag `v3.6.0`，推送分支和 tag。
-2. GitHub Actions `Release`（`.github/workflows/release.yml`）收到 `v*` tag 后在 windows-latest 上：装 nsh CLI → 校验版本与 tag 一致 → `nsh check` / `nsh test` / `nsh build --release` → `nsh package` → Inno Setup 出安装包 → `nsh update-manifest` 生成并签名 `latest.json` / `latest.json.sig` → 发布 GitHub Release（安装包、更新 zip、清单）。
+2. GitHub Actions `Release`（`.github/workflows/release.yml`）收到 `v*` tag 后在 windows-latest 上：装 nsh CLI → 校验版本与 tag 一致 → `nsh check` / `nsh test` / `nsh build --release` → `nsh package` → 把 Inno Setup 安装向导编成简体中文 → `nsh update-manifest` 生成并签名 `latest.json` / `latest.json.sig` → 发布 GitHub Release（安装包、更新 zip、清单）。
 3. 应用（`src/updater.ts`，`nsh/updater`）启动 15 秒后和每 6 小时自动检查一次；设置页「应用更新」可手动检查、下载并安装，托盘菜单在有新版本时多一项「安装更新」。下载按清单校验 SHA-256，清单用 `nsh.json` 里的 `updater.publicKey` 验签，安装后自动重启。
 
 更新清单：`https://github.com/wjyugutou/mouse_tool/releases/latest/download/latest.json`。Latest Release 必须带 `latest.json`，草稿和预发布不会被检查到。

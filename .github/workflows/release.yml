@@ -73,14 +73,15 @@ jobs:
       - name: nsh package
         run: node scripts/nsh.mjs package --target windows --icon assets/icon.png -o ${{ env.OUT_DIR }}
 
-      # `nsh package` 自己就会调 ISCC 编安装包（产物名 `yugutou_tool-setup.exe`），
-      # 所以这里通常只是改名加上版本号；只有它没编出来时才在下面兜底跑一次 ISCC。
-      - name: Build installer (Inno Setup)
+      # nsh 不写安装包语言，找到 ISCC 时会先编出英文安装包。
+      # installer-zh 给 .iss 加上简体中文并覆盖编译，然后再加上版本号改名。
+      - name: Build installer (Inno Setup, 简体中文)
         shell: pwsh
         run: |
+          node scripts/installer-zh.mjs $env:OUT_DIR --require
+          if ($LASTEXITCODE -ne 0) { throw "installer-zh failed" }
           $out = $env:OUT_DIR
           $setup = Join-Path $out 'yugutou_tool-setup.exe'
-          if (-not (Test-Path $setup)) { ISCC.exe /Q (Join-Path $out 'yugutou_tool.iss') }
           if (-not (Test-Path $setup)) { throw "installer not built: $setup" }
           Move-Item $setup (Join-Path $out "yugutou_tool-$env:VER-setup.exe") -Force
           Get-ChildItem $out | Format-Table Name, Length

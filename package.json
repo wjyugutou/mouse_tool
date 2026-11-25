@@ -10,7 +10,7 @@
     "check": "node scripts/nsh.mjs check",
     "test": "node scripts/nsh.mjs test",
     "build": "node scripts/nsh.mjs build --release",
-    "package": "node scripts/nsh.mjs package --target windows --icon assets/icon.png",
+    "package": "node scripts/nsh.mjs package --target windows --icon assets/icon.png && node scripts/installer-zh.mjs",
     "version:sync": "node scripts/sync-version.mjs",
     "release:bump": "node scripts/bump-version.mjs",
     "release:notes": "node scripts/gen-release-notes.mjs"
