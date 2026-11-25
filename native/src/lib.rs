@@ -156,6 +156,7 @@ impl Mouse {
             env!("CARGO_PKG_VERSION"),
             autostart::launched_at_login()
         ));
+        autostart::refresh_if_target_missing();
         hub::start();
     }
 
