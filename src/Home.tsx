@@ -39,7 +39,13 @@ export function Home() {
 
   return (
     <View class="flex-1 flex-row">
-      <Sidebar activeId={activeId()} onSelect={select} />
+      <Sidebar
+        activeId={activeId()}
+        onSelect={select}
+        deviceInfo={info()}
+        loading={loading()}
+        error={error()}
+      />
       <Scroll class="flex-1" contentClass="grow items-center justify-center px-10 py-8">
         <BatteryCard
           deviceName={device()?.name ?? "尚未注册任何设备"}

@@ -1,7 +1,8 @@
-/** 设备侧栏：分类 Tabs、该类设备列表、底部自动刷新状态。对应老版 DeviceList（品牌区 / MorphBot 暂不做）。 */
+/** 设备侧栏：品牌区（MorphBot）、分类 Tabs、该类设备列表、底部自动刷新状态。对应老版 DeviceList。 */
 import { effect, Scroll, signal, Text, token, untracked, View } from "nsh";
-import type { Device } from "yugutou/native";
+import type { Battery, Device } from "yugutou/native";
 import { mdiCheckCircle, mdiHeadphones, mdiKeyboard, mdiMouse } from "./icons";
+import { MorphBot } from "./morph-bot/MorphBot";
 import { CATEGORIES, CATEGORY_LABEL, deviceById, devicesIn, selectedIn, settings, type Category } from "./store";
 import { type IconData, Icon } from "./vendor/supernsh-icons";
 
@@ -77,7 +78,13 @@ function DeviceItem(props: { device: Device; selected: boolean; onPress: () => v
   );
 }
 
-export function Sidebar(props: { activeId: string; onSelect: (id: string) => void }) {
+export function Sidebar(props: {
+  activeId: string;
+  onSelect: (id: string) => void;
+  deviceInfo?: Battery | null;
+  loading?: boolean;
+  error?: string | null;
+}) {
   const activeCategory = (): Category => (deviceById(props.activeId)?.category as Category) ?? "mouse";
   const category = signal<Category>(untracked(activeCategory));
   // 托盘 / 设置里换了设备时，侧栏跟着切到对应分类。
@@ -96,7 +103,22 @@ export function Sidebar(props: { activeId: string; onSelect: (id: string) => voi
 
   return (
     <View class="w-[280px] border-r border-border/70 bg-card/30">
-      <View class="px-3 pt-4">
+      <View class="flex-row items-center gap-3 px-5 pt-5 pb-4">
+        <MorphBot
+          size={52}
+          containerSize={64}
+          deviceId={props.activeId}
+          info={props.deviceInfo ?? null}
+          loading={Boolean(props.loading)}
+          error={props.error ?? null}
+        />
+        <View class="min-w-0 flex-1">
+          <Text class="text-sm font-semibold text-foreground">外设电量</Text>
+          <Text class="mt-0.5 text-[11px] text-muted-foreground">YugutouTool</Text>
+        </View>
+      </View>
+
+      <View class="px-3">
         <View class="flex-row gap-1 rounded-xl border border-border/60 bg-muted/40 p-1">
           <Each of={CATEGORIES}>
             {(cat) => <Tab category={cat()} active={category() === cat()} onPress={() => category.set(cat())} />}

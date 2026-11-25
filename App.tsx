@@ -6,6 +6,7 @@ import { colorScheme, effect, mount, setColorScheme, View } from "nsh";
 import { Application, currentWindow, Tray } from "nsh/desktop";
 import { Mouse } from "yugutou/native";
 import { Home } from "./src/Home";
+import { clearWindowPointer, setWindowPointer } from "./src/morph-bot/pointer";
 import { SettingsPage } from "./src/SettingsPage";
 import { page, pull, samples, settings } from "./src/store";
 import { TitleBar } from "./src/TitleBar";
@@ -76,6 +77,8 @@ function App() {
   return (
     <View
       class="flex-1 bg-background"
+      onMouseMove={(e) => setWindowPointer(e.pagePosition.x, e.pagePosition.y)}
+      onMouseLeave={clearWindowPointer}
       style={{
         // 老版：深蓝黑底（--background）+ 右上 primary/10 大光晕。
         backgroundImage:
