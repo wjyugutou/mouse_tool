@@ -1,6 +1,6 @@
 [package]
 name = "yugutou-native"
-version = "4.3.0"
+version = "5.0.0"
 edition = "2021"
 publish = false
 description = "yugutou_tool 的 Rust 核心：设备插件、电量采样、设置、托盘图标、开机自启（NSH mixed）"
